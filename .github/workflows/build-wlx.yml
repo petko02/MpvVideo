@@ -1,4 +1,4 @@
-name: Build WLX Plugin (macOS Intel via Cross-Compiler)
+name: Build WLX Plugin (C / libmpv)
 
 on:
   workflow_dispatch:
@@ -6,64 +6,28 @@ on:
     branches:
       - main
 
-env:
-  FPCUP_VERSION: v2.4.0j
-
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Prepare SDK folder
+      - name: Install dependencies
         run: |
-          mkdir -p sdk
-          if [ -f "wlxplugin.pas" ] && [ ! -f "sdk/wlxplugin.pas" ]; then
-            cp wlxplugin.pas sdk/wlxplugin.pas
-          fi
+          brew update
+          brew install mpv pkg-config gtk+3
 
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget build-essential git binutils-mingw-w64-x86-64 \
-              libgtk2.0-dev libpango1.0-dev libglib2.0-dev libx11-dev
-
-      - name: Download fpcupdeluxe (full binary)
-        run: |
-          wget -O fpcupdeluxe \
-            https://github.com/LongDirtyAnimAlf/fpcupdeluxe/releases/download/${FPCUP_VERSION}/fpcupdeluxe-x86_64-linux
-          chmod +x fpcupdeluxe
-          file ./fpcupdeluxe
-          if ! file ./fpcupdeluxe | grep -q "executable"; then
-            echo "❌ fpcupdeluxe is not a valid binary!"
-            exit 1
-          fi
-
-      - name: Build Darwin cross-compiler (Intel)
-        run: |
-          ./fpcupdeluxe --fpcURL=https://gitlab.com/freepascal.org/fpc/source.git \
-                        --lazURL=https://gitlab.com/freepascal.org/lazarus/lazarus.git \
-                        --crossall darwin \
-                        --installdir=$HOME/fpcup
-          echo "$HOME/fpcup/cross/bin/x86_64-darwin" >> $GITHUB_PATH
-          echo "$HOME/fpcup/bin/x86_64-linux" >> $GITHUB_PATH
-
-      - name: Verify cross-compiler
-        run: |
-          $HOME/fpcup/bin/x86_64-linux/fpc -iW
-          ls -R $HOME/fpcup/cross/lib | grep darwin || true
-
-      - name: Cross-compile WLX plugin for macOS Intel
+      - name: Build WLX plugin
         run: |
           mkdir -p release
-          $HOME/fpcup/bin/x86_64-linux/fpc -Tdarwin -Px86_64 \
-            -Fu./ -Fu./sdk -k"-bundle" \
-            -o"release/MpvVideo.wlx" MpvVideo.lpr
+          gcc -Wall -fPIC -shared -o release/MpvVideo.wlx mpvvideo.c \
+            `pkg-config --cflags --libs gtk+-3.0` \
+            `pkg-config --cflags --libs mpv`
           ls -lh release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MpvVideo-wlx-macos-intel
+          name: MpvVideo-wlx-macos
           path: release/MpvVideo.wlx
