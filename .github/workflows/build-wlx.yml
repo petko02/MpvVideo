@@ -14,37 +14,33 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Install mpv & tools
+      - name: Install dependencies
         run: |
           brew update
-          brew install mpv        # provides libmpv.dylib
-          brew install coreutils
-
-      - name: Vendor mpv C-API headers
-        run: |
-          curl -L -o mpv.tar.gz \
-            https://github.com/mpv-player/mpv/archive/refs/tags/v0.40.0.tar.gz
-          tar -xzf mpv.tar.gz
-          mkdir -p mpv-headers/mpv
-          # Copy everything under include/mpv/ (this includes both client.h and opengl_cb.h)
-          cp mpv-0.40.0/include/mpv/*.h mpv-headers/mpv/
+          brew install mpv pkg-config coreutils
 
       - name: Prepare plugin dir
         run: mkdir -p MpvVideo.wlx
 
       - name: Compile Objective-C++
         run: |
+          # Ensure pkg-config can find libmpv’s .pc file
           PREFIX=$(brew --prefix mpv)
+          export PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}"
+          # Get the right include & lib flags
+          CFLAGS="$(pkg-config --cflags libmpv)"
+          LDFLAGS="$(pkg-config --libs   libmpv)"
+          # Compile with ObjC++ + Cocoa + QuartzCore + OpenGL
           clang++ -ObjC++ -Wall -O2 -fPIC \
+            $CFLAGS \
             -I. \
-            -Impv-headers \
-            -L"${PREFIX}/lib" \
             -framework Cocoa \
             -framework QuartzCore \
             -framework OpenGL \
-            -lmpv \
-            -dynamiclib mpvvideo.mm \
-            -o MpvVideo.wlx/libmpvvideo.dylib
+            mpvvideo.mm \
+            -dynamiclib \
+            -o MpvVideo.wlx/libmpvvideo.dylib \
+            $LDFLAGS
 
       - name: Package for release
         run: |
