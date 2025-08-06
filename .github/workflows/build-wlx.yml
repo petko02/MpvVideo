@@ -19,7 +19,7 @@ jobs:
       - name: Build WLX plugin
         run: |
           mkdir -p release
-          fpc -Fu./sdk -k"-shared" -o"release/MpvVideo.wlx" MpvVideo.lpr
+          fpc -Fu./ -k"-shared" -o"release/MpvVideo.wlx" MpvVideo.lpr
           ls -lh release
 
       - name: Upload artifact
