@@ -22,15 +22,12 @@ jobs:
 
       - name: Vendor mpv C-API headers
         run: |
-          # Grab mpv 0.40.0 source
           curl -L -o mpv.tar.gz \
             https://github.com/mpv-player/mpv/archive/refs/tags/v0.40.0.tar.gz
           tar -xzf mpv.tar.gz
           mkdir -p mpv-headers/mpv
-          # Copy the in-mpv directory headers (client.h, etc.)
+          # Copy everything under include/mpv/ (this includes both client.h and opengl_cb.h)
           cp mpv-0.40.0/include/mpv/*.h mpv-headers/mpv/
-          # Copy the opengl_cb.h from the top-level include folder
-          cp mpv-0.40.0/include/opengl_cb.h mpv-headers/mpv/
 
       - name: Prepare plugin dir
         run: mkdir -p MpvVideo.wlx
