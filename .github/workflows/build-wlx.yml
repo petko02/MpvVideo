@@ -1,34 +1,34 @@
-name: Build WLX Plugin (macOS Embedded mpv)
+name: Build MpvVideo.wlx
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-14
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install Homebrew dependencies
         run: |
-          brew update
-          brew install pkg-config
+          brew install fpc fpc-src lcl lazarus pkg-config meson ninja jpeg uchardet python@3.11
 
-      - name: Download mpv source and extract headers
+      - name: Add Python 3.11 to PATH
+        run: echo "/opt/homebrew/opt/python@3.11/bin" >> $GITHUB_PATH
+
+      - name: Download and extract mpv source (v0.34.0)
         run: |
           curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.34.0.tar.gz
           tar -xzf mpv.tar.gz
-          mkdir -p mpv-headers
-          cp -r mpv-0.34.0/libmpv mpv-headers/
 
       - name: Build libmpv (shared)
         run: |
           cd mpv-0.34.0
-          ./bootstrap.py
+          /opt/homebrew/opt/python@3.11/bin/python3 ./bootstrap.py
           ./waf configure --disable-cplayer --enable-libmpv-shared --prefix=$PWD/../mpv-local
           ./waf build
           ./waf install
@@ -36,27 +36,36 @@ jobs:
           echo "PKG_CONFIG_PATH=$PWD/mpv-local/lib/pkgconfig" >> $GITHUB_ENV
           echo "DYLD_LIBRARY_PATH=$PWD/mpv-local/lib" >> $GITHUB_ENV
 
-      - name: Build WLX plugin bundle
+      - name: Copy mpv headers
+        run: |
+          mkdir -p headers/mpv
+          cp mpv-0.34.0/libmpv/client.h headers/mpv/
+          cp mpv-0.34.0/video/out/opengl/opengl_cb.h headers/mpv/
+
+      - name: Patch BOOL typedef and detect function
+        run: |
+          sed -i '' '1i\
+#ifndef __OBJC__\
+typedef int BOOL;\
+#endif' mpvvideo.c
+          sed -i '' 's/int DCPCALL ListGetDetectString/void DCPCALL ListGetDetectString/' mpvvideo.c
+
+      - name: Compile WLX plugin
+        run: |
+          fpc -Fuheaders -Fuheaders/mpv -MObjFPC -Scgi -O2 -k"-framework Cocoa" mpvvideo.pas
+
+      - name: Create release package
         run: |
           mkdir -p release/MpvVideo
-          gcc -Wall -fPIC -ObjC -framework Cocoa \
-            -I./mpv-headers \
-            -bundle -undefined dynamic_lookup \
-            -o release/MpvVideo/MpvVideo.wlx \
-            mpvvideo.c $(pkg-config --cflags --libs mpv)
+          cp mpvvideo.wlx release/MpvVideo/
+          cp mpvvideo.ini release/MpvVideo/
+          cp mpvvideo.c release/MpvVideo/
+          cp mpvvideo.pas release/MpvVideo/
+          cp -r headers release/MpvVideo/
+          cp mpv-local/lib/libmpv.* release/MpvVideo/
 
-          cp mpv-local/lib/libmpv.dylib release/MpvVideo/
-          install_name_tool -change libmpv.1.dylib \
-              @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx || true
-
-      - name: Package plugin
-        run: |
-          cd release
-          zip -r MpvVideo-macos-embedded.zip MpvVideo
-          cd ..
-
-      - name: Upload artifact
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MpvVideo-wlx-macos-embedded
-          path: release/MpvVideo-macos-embedded.zip
+          name: MpvVideo.wlx
+          path: release/MpvVideo
