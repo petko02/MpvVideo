@@ -9,61 +9,41 @@ on:
 jobs:
   build:
     runs-on: macos-latest
+
     steps:
-      - name: Checkout repository
+      - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install runtime
+      - name: 🍺 Install mpv and build tools
         run: |
           brew update
           brew install mpv pkg-config
 
-      - name: Download and extract all mpv headers
-        run: |
-          curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.40.0.tar.gz
-          tar -xzf mpv.tar.gz
-          mkdir -p mpv-headers
-          # Copy all headers preserving structure
-          find mpv-0.40.0 -type f -name "*.h" -exec cp --parents {} mpv-headers/ \;
-          echo "✅ Headers copied:"
-          find mpv-headers -type f | head -n 30
-
-      - name: Build WLX plugin bundle
+      - name: 🧱 Build WLX plugin bundle
         run: |
           mkdir -p release/MpvVideo
-          # Dynamically locate include path for mpv headers
-          INCLUDE_PATH=$(find mpv-headers -type f -name "opengl_cb.h" | head -n 1 | xargs dirname | xargs dirname)
-          echo "✅ Using include path: $INCLUDE_PATH"
-          
+
           gcc -Wall -fPIC -ObjC -framework Cocoa \
-            -I"$INCLUDE_PATH" \
+            -I"$(brew --prefix)/include" \
             -bundle -undefined dynamic_lookup \
             -o release/MpvVideo/MpvVideo.wlx \
             mpvvideo.c $(pkg-config --cflags --libs mpv)
 
-          cp $(brew --prefix)/lib/libmpv.dylib release/MpvVideo/
-          install_name_tool -change libmpv.dylib \
-              @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx || true
+          # Embed libmpv.dylib for standalone use
+          cp "$(brew --prefix)/lib/libmpv.dylib" release/MpvVideo/
 
-      - name: Package plugin
+          # Rewrite dylib path to use relative location
+          install_name_tool -change libmpv.dylib \
+            @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx
+
+      - name: 📦 Package plugin as ZIP
         run: |
           cd release
           zip -r MpvVideo-macos-embedded.zip MpvVideo
           cd ..
 
-      - name: Upload artifact
+      - name: 🚀 Upload plugin artifact
         uses: actions/upload-artifact@v4
         with:
           name: MpvVideo-wlx-macos-embedded
           path: release/MpvVideo-macos-embedded.zip
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "v${{ github.run_number }}"
-          name: "MpvVideo WLX Plugin Build ${{ github.run_number }}"
-          draft: false
-          prerelease: false
-          files: release/MpvVideo-macos-embedded.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
