@@ -5,12 +5,13 @@
 
 static mpv_handle *mpv = NULL;
 
+__attribute__((visibility("default")))
 HWND DCPCALL ListLoad(HWND ParentWin, char *FileToLoad, int ShowFlags)
 {
     mpv = mpv_create();
     if (!mpv) return 0;
 
-    // Embed video into the host window provided by Double Commander
+    // Embed video into provided window
     char wid[64];
     snprintf(wid, sizeof(wid), "%p", (void *)ParentWin);
     mpv_set_option_string(mpv, "wid", wid);
@@ -27,6 +28,7 @@ HWND DCPCALL ListLoad(HWND ParentWin, char *FileToLoad, int ShowFlags)
     return ParentWin;
 }
 
+__attribute__((visibility("default")))
 void DCPCALL ListCloseWindow(HWND ListWin)
 {
     if (mpv) {
@@ -35,6 +37,7 @@ void DCPCALL ListCloseWindow(HWND ListWin)
     }
 }
 
+__attribute__((visibility("default")))
 void DCPCALL ListGetDetectString(char *DetectString, int maxlen)
 {
     snprintf(DetectString, maxlen - 1,
