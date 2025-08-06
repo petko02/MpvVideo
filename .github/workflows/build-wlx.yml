@@ -18,12 +18,12 @@ jobs:
           brew update
           brew install mpv pkg-config
 
-      - name: Download mpv headers
+      - name: Download older mpv (with opengl_cb.h)
         run: |
-          curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.40.0.tar.gz
+          curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.34.0.tar.gz
           tar -xzf mpv.tar.gz
           mkdir -p mpv-headers
-          cp -r mpv-0.40.0/libmpv/include/mpv mpv-headers/ || true
+          cp -r mpv-0.34.0/libmpv/include/mpv mpv-headers/ || true
           echo "✅ Headers copied:"
           find mpv-headers/mpv -type f || true
 
