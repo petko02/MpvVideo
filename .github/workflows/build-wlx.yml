@@ -1,4 +1,4 @@
-name: Build WLX Plugin (macOS)
+name: Build WLX Plugin for macOS Intel
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -20,17 +20,19 @@ jobs:
             cp wlxplugin.pas sdk/wlxplugin.pas
           fi
 
-      - name: Install Free Pascal
-        run: brew install fpc
+      - name: Install Free Pascal cross-compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fp-compiler ppcrossx64-darwin
 
-      - name: Build WLX plugin
+      - name: Build WLX plugin for macOS Intel
         run: |
           mkdir -p release
-          fpc -Fu./ -Fu./sdk -k"-bundle" -o"release/MpvVideo.wlx" MpvVideo.lpr
+          ppcrossx64-darwin -Fu./ -Fu./sdk -k"-bundle" -o"release/MpvVideo.wlx" MpvVideo.lpr
           ls -lh release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MpvVideo-wlx-macos
+          name: MpvVideo-wlx-macos-intel
           path: release/MpvVideo.wlx
