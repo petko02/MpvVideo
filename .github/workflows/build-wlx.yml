@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest   # Intel macOS; self-hosted ARM if you need M1
+    runs-on: macos-latest
 
     steps:
       - name: Checkout repo
@@ -16,8 +16,8 @@ jobs:
       - name: Install mpv & tools
         run: |
           brew update
-          brew install mpv       # provides libmpv & headers
-          brew install coreutils # gnu tools if you need them
+          brew install mpv
+          brew install coreutils
 
       - name: Prepare plugin dir
         run: mkdir -p MpvVideo.wlx
@@ -25,7 +25,7 @@ jobs:
       - name: Compile Objective-C++
         run: |
           clang++ -ObjC++ -Wall -O2 -fPIC \
-            -I. \                       # so it finds common.h, wlxplugin.h
+            -I. \
             -framework Cocoa \
             -framework QuartzCore \
             -lmpv \
@@ -41,7 +41,7 @@ jobs:
           cd release && zip -r MpvVideo.zip MpvVideo
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: MpvVideo
           path: release/MpvVideo.zip
