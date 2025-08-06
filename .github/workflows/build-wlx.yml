@@ -13,32 +13,37 @@ jobs:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🍺 Install mpv runtime
+      - name: 📦 Download mpv v0.34 source
         run: |
-          brew update
-          brew install mpv@0.34 pkg-config
-          brew link --force mpv@0.34
+          curl -L -o mpv-0.34.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.34.0.tar.gz
+          tar -xzf mpv-0.34.tar.gz
+          mv mpv-0.34.0 mpv-source
 
-      - name: 📦 Clone mpv v0.34 source for headers
+      - name: 🔨 Build libmpv from source
         run: |
-          git clone --depth=1 --branch v0.34.0 https://github.com/mpv-player/mpv.git mpv-source
+          brew install meson ninja pkg-config waf \
+              libass luajit little-cms2 jpeg libplacebo uchardet
+          cd mpv-source
+          ./bootstrap.py
+          ./waf configure --disable-cplayer --enable-libmpv-shared
+          ./waf build
+          ./waf install --destdir=../mpv-install
+          cd ..
+
           mkdir -p mpv-headers/mpv
-          cp -r mpv-source/libmpv/client.h mpv-headers/mpv/
-          cp -r mpv-source/video/out/opengl/opengl_cb.h mpv-headers/mpv/
-          # Ensure other standard headers
           cp -r mpv-source/libmpv/*.h mpv-headers/mpv/
+          cp mpv-source/video/out/opengl/opengl_cb.h mpv-headers/mpv/
+          cp mpv-install/usr/local/lib/libmpv.dylib .
 
-      - name: 🧱 Build WLX plugin bundle
+      - name: 🧱 Build WLX plugin
         run: |
           mkdir -p release/MpvVideo
           gcc -Wall -fPIC -ObjC -framework Cocoa \
             -I./mpv-headers \
             -bundle -undefined dynamic_lookup \
             -o release/MpvVideo/MpvVideo.wlx \
-            mpvvideo.c $(pkg-config --cflags --libs mpv)
-
-          # Embed libmpv.dylib for standalone use
-          cp "$(brew --prefix mpv@0.34)/lib/libmpv.dylib" release/MpvVideo/
+            mpvvideo.c
+          cp libmpv.dylib release/MpvVideo/
           install_name_tool -change libmpv.dylib \
               @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx || true
 
