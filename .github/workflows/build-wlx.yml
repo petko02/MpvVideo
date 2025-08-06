@@ -29,23 +29,19 @@ jobs:
           sudo apt-get install -y wget build-essential git binutils-mingw-w64-x86-64 \
               libgtk2.0-dev libpango1.0-dev libglib2.0-dev libx11-dev
 
-      - name: Download fpcupdeluxemini
+      - name: Download fpcupdeluxe (full binary)
         run: |
-          wget -O fpcupdeluxemini \
-            https://github.com/LongDirtyAnimAlf/fpcupdeluxe/releases/download/${FPCUP_VERSION}/fpcupdeluxemini-x86_64-linux
-          chmod +x fpcupdeluxemini
-          file ./fpcupdeluxemini
-          if ! file ./fpcupdeluxemini | grep -q "executable"; then
-            echo "❌ fpcupdeluxemini is not a valid binary!"
-            exit 1
-          fi
+          wget -O fpcupdeluxe \
+            https://github.com/LongDirtyAnimAlf/fpcupdeluxe/releases/download/${FPCUP_VERSION}/fpcupdeluxe-x86_64-linux
+          chmod +x fpcupdeluxe
+          file ./fpcupdeluxe
 
       - name: Build Darwin cross-compiler (Intel)
         run: |
-          ./fpcupdeluxemini --fpcURL=https://gitlab.com/freepascal.org/fpc/source.git \
-                            --lazURL=https://gitlab.com/freepascal.org/lazarus/lazarus.git \
-                            --crossall darwin \
-                            --installdir=$HOME/fpcup
+          ./fpcupdeluxe --fpcURL=https://gitlab.com/freepascal.org/fpc/source.git \
+                        --lazURL=https://gitlab.com/freepascal.org/lazarus/lazarus.git \
+                        --crossall darwin \
+                        --installdir=$HOME/fpcup
           echo "$HOME/fpcup/cross/bin/x86_64-darwin" >> $GITHUB_PATH
           echo "$HOME/fpcup/bin/x86_64-linux" >> $GITHUB_PATH
 
