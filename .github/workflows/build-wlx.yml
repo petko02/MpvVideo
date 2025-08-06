@@ -21,7 +21,7 @@ jobs:
 
       - name: 🔨 Build libmpv from source
         run: |
-          brew install meson ninja pkg-config waf \
+          brew install meson ninja pkg-config \
               libass luajit little-cms2 jpeg libplacebo uchardet
           cd mpv-source
           ./bootstrap.py
