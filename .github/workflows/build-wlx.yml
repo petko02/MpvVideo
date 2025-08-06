@@ -20,9 +20,9 @@ jobs:
             cp wlxplugin.pas sdk/wlxplugin.pas
           fi
 
-      - name: Install build dependencies
+      - name: Install dependencies and bootstrap FPC
         run: |
-          brew install make git
+          brew install fpc make git
 
       - name: Download Free Pascal 3.3.1 source
         run: |
@@ -30,14 +30,19 @@ jobs:
           cd fpc-source
           git checkout main
 
-      - name: Bootstrap FPC (build ARM compiler)
+      - name: Generate Makefiles
+        run: |
+          cd fpc-source
+          fpcmake -Tall
+
+      - name: Build and install Free Pascal 3.3.1
         run: |
           cd fpc-source
           make all
           sudo make install
-          fpc -iW  # Verify compiler version
+          fpc -iW  # Show installed version
 
-      - name: Build WLX plugin with FPC 3.3.1
+      - name: Build WLX plugin
         run: |
           mkdir -p release
           fpc -Fu./ -Fu./sdk -k"-bundle" -o"release/MpvVideo.wlx" MpvVideo.lpr
