@@ -10,17 +10,25 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Prepare SDK folder
+        run: |
+          mkdir -p sdk
+          if [ -f "wlxplugin.pas" ] && [ ! -f "sdk/wlxplugin.pas" ]; then
+            cp wlxplugin.pas sdk/wlxplugin.pas
+          fi
+          echo "SDK folder prepared with wlxplugin.pas"
 
       - name: Install Free Pascal
         run: sudo apt-get update && sudo apt-get install -y fp-compiler
 
       - name: Build WLX plugin
-  run: |
-    mkdir -p release
-    fpc -Fu./ -Fu./sdk -k"-shared" -o"release/MpvVideo.wlx" MpvVideo.lpr
-    ls -lh release
+        run: |
+          mkdir -p release
+          fpc -Fu./ -Fu./sdk -k"-shared" -o"release/MpvVideo.wlx" MpvVideo.lpr
+          ls -lh release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
