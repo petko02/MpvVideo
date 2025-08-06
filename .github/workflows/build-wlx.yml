@@ -25,7 +25,7 @@ jobs:
           cp -r mpv-0.34.0/libmpv mpv-headers/mpv
           cp -r mpv-0.34.0/include/mpv/*.h mpv-headers/mpv/
 
-      - name: Patch BOOL typedef and ListGetDetectString
+     - name: Patch BOOL typedef and ListGetDetectString
         run: |
           # Patch BOOL definition to avoid conflict with Cocoa headers
           sed -i '' '1i\
