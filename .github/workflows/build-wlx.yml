@@ -17,19 +17,20 @@ jobs:
       - name: Install mpv & tools
         run: |
           brew update
-          brew install mpv
+          brew install mpv        # provides libmpv.dylib
           brew install coreutils
 
       - name: Vendor mpv C-API headers
         run: |
+          # Grab mpv 0.40.0 source
           curl -L -o mpv.tar.gz \
             https://github.com/mpv-player/mpv/archive/refs/tags/v0.40.0.tar.gz
           tar -xzf mpv.tar.gz
           mkdir -p mpv-headers/mpv
-          # High-level API headers
+          # Copy the in-mpv directory headers (client.h, etc.)
           cp mpv-0.40.0/include/mpv/*.h mpv-headers/mpv/
-          # The opengl_cb header lives under libmpv/
-          cp mpv-0.40.0/libmpv/opengl_cb.h mpv-headers/mpv/
+          # Copy the opengl_cb.h from the top-level include folder
+          cp mpv-0.40.0/include/opengl_cb.h mpv-headers/mpv/
 
       - name: Prepare plugin dir
         run: mkdir -p MpvVideo.wlx
