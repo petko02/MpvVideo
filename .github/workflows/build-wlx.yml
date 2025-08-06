@@ -1,0 +1,29 @@
+name: Build WLX Plugin
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Install Free Pascal
+        run: sudo apt-get update && sudo apt-get install -y fp-compiler
+
+      - name: Build WLX plugin
+        run: |
+          mkdir -p release
+          fpc -Fu./sdk -k"-shared" -o"release/MpvVideo.wlx" MpvVideo.lpr
+          ls -lh release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: MpvVideo-wlx
+          path: release/MpvVideo.wlx
