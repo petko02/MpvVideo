@@ -1,4 +1,3 @@
-# .github/workflows/build-wlx.yml
 name: Build WLX Plugin (MpvVideo)
 
 on:
@@ -17,25 +16,26 @@ jobs:
       - name: Install mpv & tools
         run: |
           brew update
-          brew install mpv          # installs libmpv dylib to link against :contentReference[oaicite:0]{index=0}
+          brew install mpv        # provides libmpv.dylib
           brew install coreutils
 
-      - name: Download mpv headers
+      - name: Download & vendor mpv headers
         run: |
-          # Pull down the official mpv 0.40.0 headers :contentReference[oaicite:1]{index=1}
+          # Grab mpv 0.40.0 source and extract just the C-API headers
           curl -L -o mpv.tar.gz \
             https://github.com/mpv-player/mpv/archive/refs/tags/v0.40.0.tar.gz
           tar -xzf mpv.tar.gz
           mkdir -p mpv-headers/mpv
-          # Copy only the C API headers (client.h, opengl_cb.h, etc.) from include/mpv
+          # copy the high-level C API headers
           cp mpv-0.40.0/include/mpv/*.h mpv-headers/mpv/
+          # copy the libmpv sub-API headers (including opengl_cb.h)
+          cp mpv-0.40.0/libmpv/*.h mpv-headers/mpv/
 
       - name: Prepare plugin dir
         run: mkdir -p MpvVideo.wlx
 
       - name: Compile Objective-C++
         run: |
-          # Link against Homebrew’s libmpv, but include our vendored headers
           PREFIX=$(brew --prefix mpv)
           clang++ -ObjC++ -Wall -O2 -fPIC \
             -I. \
