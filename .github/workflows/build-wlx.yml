@@ -17,10 +17,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y fp-compiler
 
       - name: Build WLX plugin
-        run: |
-          mkdir -p release
-          fpc -Fu./ -k"-shared" -o"release/MpvVideo.wlx" MpvVideo.lpr
-          ls -lh release
+  run: |
+    mkdir -p release
+    fpc -Fu./ -Fu./sdk -k"-shared" -o"release/MpvVideo.wlx" MpvVideo.lpr
+    ls -lh release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
