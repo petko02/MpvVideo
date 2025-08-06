@@ -1,52 +1,55 @@
-name: Build WLX Plugin (Mpv embedded, macOS)
+name: Build WLX Plugin (macOS Embedded mpv)
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: macos-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install mpv and pkg-config
         run: |
           brew update
           brew install mpv pkg-config
 
-      - name: Download mpv v0.34.0 and extract headers
+      - name: Patch BOOL typedef and detect function
         run: |
-          curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.34.0.tar.gz
-          tar -xzf mpv.tar.gz
-          mkdir -p mpv-headers/mpv
-          cp mpv-0.34.0/libmpv/client.h mpv-headers/mpv/
-          cp mpv-0.34.0/libmpv/opengl_cb.h mpv-headers/mpv/
+          # Fix BOOL conflict
+          sed -i '' '1i\
+#ifndef __OBJC__\
+typedef int BOOL;\
+#endif' mpvvideo.c
+          
+          # Fix ListGetDetectString return type
+          sed -i '' 's/int DCPCALL ListGetDetectString/void DCPCALL ListGetDetectString/' mpvvideo.c
 
       - name: Build WLX plugin
         run: |
           mkdir -p release/MpvVideo
           gcc -Wall -fPIC -ObjC -framework Cocoa \
-            -I./mpv-headers \
             -bundle -undefined dynamic_lookup \
             -o release/MpvVideo/MpvVideo.wlx \
             mpvvideo.c $(pkg-config --cflags --libs mpv)
 
+          # Copy libmpv to make it self-contained
           cp $(brew --prefix)/lib/libmpv.dylib release/MpvVideo/
           install_name_tool -change libmpv.dylib \
-              @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx || true
+            @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx || true
 
       - name: Package plugin
         run: |
           cd release
-          zip -r MpvVideo-macos-embedded.zip MpvVideo
+          zip -r MpvVideo-macos.zip MpvVideo
           cd ..
 
-      - name: Upload build artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MpvVideo-wlx-macos-embedded
-          path: release/MpvVideo-macos-embedded.zip
+          name: MpvVideo-wlx-macos
+          path: release/MpvVideo-macos.zip
