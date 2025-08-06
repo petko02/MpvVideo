@@ -18,22 +18,22 @@ jobs:
           brew update
           brew install mpv pkg-config
 
-      - name: Download and extract full mpv headers
+      - name: Download and extract all mpv headers
         run: |
           curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.40.0.tar.gz
           tar -xzf mpv.tar.gz
           mkdir -p mpv-headers
-          # Copy entire include folder
-          cp -r mpv-0.40.0/libmpv/include/mpv mpv-headers/
+          # Copy all headers preserving folder structure
+          find mpv-0.40.0 -type f -name "*.h" -exec cp --parents {} mpv-headers/ \;
 
           echo "Headers copied to mpv-headers:"
-          find mpv-headers/mpv -type f
+          find mpv-headers -type f | head -n 20
 
       - name: Build WLX plugin bundle
         run: |
           mkdir -p release/MpvVideo
           gcc -Wall -fPIC -ObjC -framework Cocoa \
-            -I./mpv-headers \
+            -I./mpv-headers/mpv-0.40.0 \
             -bundle -undefined dynamic_lookup \
             -o release/MpvVideo/MpvVideo.wlx \
             mpvvideo.c $(pkg-config --cflags --libs mpv)
@@ -53,3 +53,14 @@ jobs:
         with:
           name: MpvVideo-wlx-macos-embedded
           path: release/MpvVideo-macos-embedded.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ github.run_number }}"
+          name: "MpvVideo WLX Plugin Build ${{ github.run_number }}"
+          draft: false
+          prerelease: false
+          files: release/MpvVideo-macos-embedded.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
