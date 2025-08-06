@@ -1,6 +1,16 @@
 // mpvvideo.mm
 #import <Cocoa/Cocoa.h>
 #import <QuartzCore/QuartzCore.h>
+#import <stdint.h>
+
+// Stub out FILETIME on macOS so common.h (which references it) will compile:
+#ifndef _FILETIME_DEFINED
+#define _FILETIME_DEFINED
+typedef struct {
+    uint32_t dwLowDateTime;
+    uint32_t dwHighDateTime;
+} FILETIME;
+#endif
 
 #import "common.h"
 #import "wlxplugin.h"
@@ -32,7 +42,7 @@
 }
 @end
 
-#pragma mark –– Controller to bridge Cocoa actions → C callbacks
+#pragma mark –– Controller to bridge Cocoa → C callbacks
 
 @interface MpvController : NSObject
 @end
