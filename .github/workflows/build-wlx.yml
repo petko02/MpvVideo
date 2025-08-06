@@ -1,4 +1,4 @@
-name: Build WLX Plugin (Embedded mpv, macOS, v0.36.0)
+name: Build WLX Plugin (Embedded mpv, macOS, v0.34)
 
 on:
   workflow_dispatch:
@@ -16,16 +16,17 @@ jobs:
       - name: 🍺 Install mpv runtime
         run: |
           brew update
-          brew install mpv pkg-config
+          brew install mpv@0.34 pkg-config
+          brew link --force mpv@0.34
 
-      - name: 📦 Clone mpv v0.36.0 source for full headers
+      - name: 📦 Clone mpv v0.34 source for headers
         run: |
-          git clone --depth=1 --branch v0.36.0 https://github.com/mpv-player/mpv.git mpv-source
+          git clone --depth=1 --branch v0.34.0 https://github.com/mpv-player/mpv.git mpv-source
           mkdir -p mpv-headers/mpv
-          # Public headers
-          cp -r mpv-source/include/mpv/* mpv-headers/mpv/
-          # OpenGL callback header
-          cp mpv-source/video/out/opengl/opengl_cb.h mpv-headers/mpv/
+          cp -r mpv-source/libmpv/client.h mpv-headers/mpv/
+          cp -r mpv-source/video/out/opengl/opengl_cb.h mpv-headers/mpv/
+          # Ensure other standard headers
+          cp -r mpv-source/libmpv/*.h mpv-headers/mpv/
 
       - name: 🧱 Build WLX plugin bundle
         run: |
@@ -37,7 +38,7 @@ jobs:
             mpvvideo.c $(pkg-config --cflags --libs mpv)
 
           # Embed libmpv.dylib for standalone use
-          cp "$(brew --prefix)/lib/libmpv.dylib" release/MpvVideo/
+          cp "$(brew --prefix mpv@0.34)/lib/libmpv.dylib" release/MpvVideo/
           install_name_tool -change libmpv.dylib \
               @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx || true
 
