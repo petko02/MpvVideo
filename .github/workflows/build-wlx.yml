@@ -1,68 +1,48 @@
-name: Build WLX Plugin (Embedded mpv, macOS, v0.34)
+name: Build WLX Plugin (Embedded mpv, macOS)
 
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: macos-latest
-
     steps:
-      - name: 📥 Checkout repository
+      - name: ✅ Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🗂️ Cache mpv build
-        id: cache-mpv
-        uses: actions/cache@v4
-        with:
-          path: |
-            mpv-install
-            mpv-headers
-            libmpv.dylib
-          key: mpv-macos-0.34-${{ runner.os }}
-
-      - name: 📦 Download mpv v0.34 source (if cache miss)
-        if: steps.cache-mpv.outputs.cache-hit != 'true'
+      - name: 🍺 Install required tools
         run: |
-          curl -L -o mpv-0.34.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.34.0.tar.gz
-          tar -xzf mpv-0.34.tar.gz
-          mv mpv-0.34.0 mpv-source
+          brew update
+          brew install meson ninja pkg-config mpv jpeg uchardet
 
-      - name: 🛠️ Install Python distutils (fix Waf build)
-        if: steps.cache-mpv.outputs.cache-hit != 'true'
+      - name: 🛠️ Install distutils workaround for waf (PEP 668 fix)
         run: |
-          pip3 install --user setuptools
+          pip3 install setuptools --break-system-packages
 
-      - name: 🔨 Build libmpv from source (if cache miss)
-        if: steps.cache-mpv.outputs.cache-hit != 'true'
+      - name: 📥 Clone mpv source for headers
         run: |
-          brew install meson ninja pkg-config \
-              libass luajit little-cms2 jpeg libplacebo uchardet
-          cd mpv-source
-          ./bootstrap.py
-          ./waf configure --disable-cplayer --enable-libmpv-shared
-          ./waf build
-          ./waf install --destdir=../mpv-install
-          cd ..
-
+          git clone --depth=1 https://github.com/mpv-player/mpv.git mpv-source
           mkdir -p mpv-headers/mpv
-          cp -r mpv-source/libmpv/*.h mpv-headers/mpv/
-          cp mpv-source/video/out/opengl/opengl_cb.h mpv-headers/mpv/
-          cp mpv-install/usr/local/lib/libmpv.dylib .
+          cp -r mpv-source/libmpv/client.h mpv-headers/mpv/
+          cp -r mpv-source/video/out/opengl/mpv_opengl_cb.h mpv-headers/mpv/
+          echo "Headers copied:"
+          find mpv-headers/mpv -type f
 
-      - name: 🧱 Build WLX plugin
+      - name: 🧱 Build WLX plugin with embedded libmpv
         run: |
           mkdir -p release/MpvVideo
           gcc -Wall -fPIC -ObjC -framework Cocoa \
             -I./mpv-headers \
             -bundle -undefined dynamic_lookup \
             -o release/MpvVideo/MpvVideo.wlx \
-            mpvvideo.c
-          cp libmpv.dylib release/MpvVideo/
+            mpvvideo.c $(pkg-config --cflags --libs mpv)
+
+          cp $(brew --prefix mpv)/lib/libmpv.dylib release/MpvVideo/
           install_name_tool -change libmpv.dylib \
-              @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx || true
+            @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx
 
       - name: 📦 Package plugin
         run: |
@@ -70,7 +50,7 @@ jobs:
           zip -r MpvVideo-macos-embedded.zip MpvVideo
           cd ..
 
-      - name: 🚀 Upload artifact
+      - name: ⬆️ Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: MpvVideo-wlx-macos-embedded
