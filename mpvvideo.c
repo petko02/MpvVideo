@@ -1,7 +1,7 @@
-#include "wlxplugin.h"
 #include <Cocoa/Cocoa.h>
 #include <mpv/client.h>
 #include <mpv/opengl_cb.h>
+#include "wlxplugin.h"
 
 #ifndef __OBJC__
 typedef int BOOL;
@@ -10,59 +10,83 @@ typedef int BOOL;
 static mpv_handle *mpv = NULL;
 static mpv_opengl_cb_context *mpv_gl = NULL;
 static NSView *videoView = nil;
+static NSSlider *seekSlider = nil;
+static NSButton *playPauseButton = nil;
+static BOOL isPaused = NO;
+
+@interface MPVView : NSOpenGLView
+@end
+
+@implementation MPVView
+- (void)drawRect:(NSRect)dirtyRect {
+    if (mpv_gl) {
+        mpv_opengl_cb_draw(mpv_gl, 0, self.bounds.size.width, -self.bounds.size.height);
+    }
+}
+@end
+
+static void on_mpv_render_update(void *ctx) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [videoView setNeedsDisplay:YES];
+    });
+}
+
+static void togglePlayPause(id sender) {
+    isPaused = !isPaused;
+    mpv_command_string(mpv, isPaused ? "set pause yes" : "set pause no");
+    [playPauseButton setTitle:(isPaused ? @"▶️" : @"⏸️")];
+}
+
+static void seekPosition(id sender) {
+    double pos = [seekSlider doubleValue];
+    char cmd[64];
+    snprintf(cmd, sizeof(cmd), "seek %f absolute", pos);
+    mpv_command_string(mpv, cmd);
+}
 
 HWND DCPCALL ListLoad(HWND ParentWin, char* FileToLoad, int ShowFlags) {
-    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    if (!mpv) {
+        mpv = mpv_create();
+        mpv_initialize(mpv);
+    }
 
-    NSView *parentView = (NSView *)ParentWin;
-    videoView = [[NSView alloc] initWithFrame:[parentView bounds]];
-    [videoView setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
-    [parentView addSubview:videoView];
+    NSRect rect = NSMakeRect(0, 0, 400, 300);
+    videoView = [[MPVView alloc] initWithFrame:rect];
 
-    mpv = mpv_create();
-    if (!mpv) return (HWND)videoView;
-
-    mpv_set_option_string(mpv, "vo", "libmpv");
-    mpv_initialize(mpv);
-
+    NSOpenGLContext *glContext = [videoView openGLContext];
     mpv_gl = mpv_get_sub_api(mpv, MPV_SUB_API_OPENGL_CB);
-    if (!mpv_gl) return (HWND)videoView;
-
-    NSOpenGLContext *glContext = [[NSOpenGLContext alloc] initWithFormat:[NSOpenGLPixelFormat alloc]
-                                                             shareContext:nil];
-    [videoView setWantsLayer:YES];
-    [videoView.layer setContentsScale:[[NSScreen mainScreen] backingScaleFactor]];
-
-    mpv_opengl_cb_init_gl(mpv_gl, NULL, NULL, NULL);
+    mpv_opengl_cb_init_gl(mpv_gl, NULL, NULL);
+    mpv_opengl_cb_set_update_callback(mpv_gl, on_mpv_render_update, NULL);
 
     const char *cmd[] = {"loadfile", FileToLoad, NULL};
     mpv_command(mpv, cmd);
 
-    [pool drain];
+    // Play/Pause button
+    playPauseButton = [[NSButton alloc] initWithFrame:NSMakeRect(10, 10, 50, 24)];
+    [playPauseButton setTitle:@"⏸️"];
+    [playPauseButton setTarget:NSApp];
+    [playPauseButton setAction:@selector(togglePlayPause:)];
+    [videoView addSubview:playPauseButton];
+
+    // Seek slider
+    seekSlider = [[NSSlider alloc] initWithFrame:NSMakeRect(70, 10, 300, 24)];
+    [seekSlider setMinValue:0];
+    [seekSlider setMaxValue:100];
+    [seekSlider setTarget:NSApp];
+    [seekSlider setAction:@selector(seekPosition:)];
+    [videoView addSubview:seekSlider];
+
     return (HWND)videoView;
 }
 
 void DCPCALL ListCloseWindow(HWND ListWin) {
-    if (mpv_gl) {
-        mpv_opengl_cb_uninit_gl(mpv_gl);
-        mpv_gl = NULL;
-    }
     if (mpv) {
         mpv_terminate_destroy(mpv);
         mpv = NULL;
     }
-    if (videoView) {
-        [videoView removeFromSuperview];
-        [videoView release];
-        videoView = nil;
-    }
 }
 
 void DCPCALL ListGetDetectString(char* DetectString, int maxlen) {
-    const char *detect =
-        "EXT=\"MP4\" | EXT=\"M4V\" | EXT=\"MKV\" | EXT=\"AVI\" | EXT=\"MOV\" | "
-        "EXT=\"WMV\" | EXT=\"FLV\" | EXT=\"WEBM\" | EXT=\"MPG\" | EXT=\"MPEG\" | "
-        "EXT=\"3GP\" | EXT=\"TS\" | EXT=\"OGV\" | EXT=\"VOB\" | EXT=\"ASF\"";
-    strncpy(DetectString, detect, maxlen - 1);
-    DetectString[maxlen - 1] = '\0';
+    snprintf(DetectString, maxlen,
+             "EXT=\"MP4\" | EXT=\"MKV\" | EXT=\"AVI\" | EXT=\"MOV\" | EXT=\"WMV\" | EXT=\"M4V\" | EXT=\"FLV\"");
 }
