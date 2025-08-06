@@ -18,10 +18,10 @@ jobs:
           brew update
           brew install mpv coreutils
 
-      - name: Download mpv headers from upstream
+      - name: Download mpv headers (opengl_cb.h and client.h)
         run: |
-          curl -L -o client.h https://raw.githubusercontent.com/mpv-player/mpv/master/libmpv/client.h
-          curl -L -o opengl_cb.h https://raw.githubusercontent.com/mpv-player/mpv/master/libmpv/opengl_cb.h
+          curl -L -o opengl_cb.h https://raw.githubusercontent.com/Ivshti/libmpv/master/include/mpv/opengl_cb.h
+          curl -L -o client.h     https://raw.githubusercontent.com/mpv-player/mpv/v0.40.0/include/mpv/client.h
 
       - name: Prepare plugin directory
         run: mkdir -p MpvVideo.wlx
