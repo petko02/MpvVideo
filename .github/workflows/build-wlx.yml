@@ -1,4 +1,4 @@
-name: Build WLX Plugin (macOS Embedded mpv 0.34 + Seek Bar)
+name: Build WLX Plugin (macOS Embedded mpv 0.34 from Source)
 
 on:
   push:
@@ -13,21 +13,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Tap and Install mpv 0.34
+      - name: Install build dependencies
         run: |
           brew update
-          brew tap mpv-player/mpv
-          brew extract --version=0.34 mpv mpv-player/mpv || true
-          brew install mpv@0.34 || true
+          brew install pkg-config meson ninja python@3.13 \
+                       ffmpeg libass luajit jpeg uchardet
 
-      - name: Download mpv 0.34 headers
+      - name: Download and build mpv 0.34
         run: |
           curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.34.0.tar.gz
           tar -xzf mpv.tar.gz
-          mkdir -p mpv-headers
-          cp -r mpv-0.34.0/libmpv/include/mpv mpv-headers/ || true
-          echo "✅ Headers copied:"
-          find mpv-headers/mpv -type f || true
+          cd mpv-0.34.0
+          ./bootstrap.py
+          ./waf configure --disable-cplayer --enable-libmpv-shared --prefix=$PWD/../mpv-local
+          ./waf build
+          ./waf install
+          cd ..
+          echo "PKG_CONFIG_PATH=$PWD/mpv-local/lib/pkgconfig" >> $GITHUB_ENV
+          echo "DYLD_LIBRARY_PATH=$PWD/mpv-local/lib" >> $GITHUB_ENV
 
       - name: Patch BOOL typedef and Detect function
         run: |
@@ -36,20 +39,18 @@ jobs:
           echo '#endif' >> tmpfile
           cat mpvvideo.c >> tmpfile
           mv tmpfile mpvvideo.c
-
           sed -i '' 's/int DCPCALL ListGetDetectString/void DCPCALL ListGetDetectString/' mpvvideo.c
 
       - name: Build WLX plugin
         run: |
           mkdir -p release/MpvVideo
           gcc -Wall -fPIC -ObjC -framework Cocoa \
-            -I./mpv-headers \
+            -I./mpv-local/include \
             -bundle -undefined dynamic_lookup \
             -o release/MpvVideo/MpvVideo.wlx \
-            mpvvideo.c $(pkg-config --cflags --libs mpv@0.34 || pkg-config --cflags --libs mpv)
+            mpvvideo.c $(pkg-config --cflags --libs mpv)
 
-          # Copy the matching libmpv
-          cp $(brew --prefix mpv@0.34)/lib/libmpv.dylib release/MpvVideo/ || cp $(brew --prefix mpv)/lib/libmpv.dylib release/MpvVideo/
+          cp mpv-local/lib/libmpv.dylib release/MpvVideo/
           install_name_tool -change libmpv.dylib \
             @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx || true
 
