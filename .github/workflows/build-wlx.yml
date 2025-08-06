@@ -18,13 +18,13 @@ jobs:
           brew update
           brew install mpv pkg-config
 
-      - name: 📦 Clone mpv source for all headers (including opengl_cb.h)
+      - name: 📦 Clone mpv source for full headers
         run: |
           git clone --depth=1 https://github.com/mpv-player/mpv.git mpv-source
           mkdir -p mpv-headers/mpv
           # Public headers
           cp -r mpv-source/include/mpv/* mpv-headers/mpv/
-          # OpenGL callback header
+          # OpenGL callback header (private)
           cp mpv-source/video/out/opengl/opengl_cb.h mpv-headers/mpv/
 
       - name: 🧱 Build WLX plugin bundle
