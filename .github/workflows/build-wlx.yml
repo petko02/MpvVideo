@@ -1,3 +1,4 @@
+# .github/workflows/build-wlx.yml
 name: Build WLX Plugin (MpvVideo)
 
 on:
@@ -26,8 +27,11 @@ jobs:
         run: |
           clang++ -ObjC++ -Wall -O2 -fPIC \
             -I. \
+            -I/usr/local/include \
+            -L/usr/local/lib \
             -framework Cocoa \
             -framework QuartzCore \
+            -framework OpenGL \
             -lmpv \
             -dynamiclib mpvvideo.mm \
             -o MpvVideo.wlx/libmpvvideo.dylib
