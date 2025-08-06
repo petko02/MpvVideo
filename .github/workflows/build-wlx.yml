@@ -1,4 +1,3 @@
-# .github/workflows/build-wlx.yml
 name: Build WLX Plugin (MpvVideo)
 
 on:
@@ -25,10 +24,12 @@ jobs:
 
       - name: Compile Objective-C++
         run: |
+          # Detect mpv’s Homebrew prefix (Intel vs ARM) so headers and libs are found :contentReference[oaicite:0]{index=0}
+          PREFIX=$(brew --prefix mpv)
           clang++ -ObjC++ -Wall -O2 -fPIC \
             -I. \
-            -I/usr/local/include \
-            -L/usr/local/lib \
+            -I"${PREFIX}/include" \
+            -L"${PREFIX}/lib" \
             -framework Cocoa \
             -framework QuartzCore \
             -framework OpenGL \
