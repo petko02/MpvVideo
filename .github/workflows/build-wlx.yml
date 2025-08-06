@@ -11,14 +11,22 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
       - name: Install dependencies
         run: |
           brew update
           brew install mpv coreutils
 
-      - name: Prepare plugin dir
+      - name: Organize headers for mpv
+        run: |
+          # Move the two headers into a mpv/ folder so imports like <mpv/client.h> work
+          mkdir -p mpv
+          mv client.h        mpv/client.h
+          mv opengl_cb.h     mpv/opengl_cb.h
+
+      - name: Prepare plugin directory
         run: mkdir -p MpvVideo.wlx
 
       - name: Compile Objective-C++
@@ -43,7 +51,8 @@ jobs:
           cp README.md release/MpvVideo/      || true
           cd release && zip -r MpvVideo.zip MpvVideo
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: MpvVideo
           path: release/MpvVideo.zip
