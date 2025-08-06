@@ -1,3 +1,4 @@
+# .github/workflows/build-wlx.yml
 name: Build WLX Plugin (MpvVideo)
 
 on:
@@ -19,17 +20,14 @@ jobs:
           brew install mpv        # provides libmpv.dylib
           brew install coreutils
 
-      - name: Download & vendor mpv headers
+      - name: Download & vendor mpv C-API headers
         run: |
-          # Grab mpv 0.40.0 source and extract just the C-API headers
           curl -L -o mpv.tar.gz \
             https://github.com/mpv-player/mpv/archive/refs/tags/v0.40.0.tar.gz
           tar -xzf mpv.tar.gz
           mkdir -p mpv-headers/mpv
-          # copy the high-level C API headers
+          # Copy only the headers under include/mpv (client.h, opengl_cb.h, etc.)
           cp mpv-0.40.0/include/mpv/*.h mpv-headers/mpv/
-          # copy the libmpv sub-API headers (including opengl_cb.h)
-          cp mpv-0.40.0/libmpv/*.h mpv-headers/mpv/
 
       - name: Prepare plugin dir
         run: mkdir -p MpvVideo.wlx
