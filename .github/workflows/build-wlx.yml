@@ -22,7 +22,10 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/mpv-player/mpv.git mpv-source
           mkdir -p mpv-headers/mpv
+          # Public headers
           cp -r mpv-source/include/mpv/* mpv-headers/mpv/
+          # OpenGL callback header
+          cp mpv-source/video/out/opengl/opengl_cb.h mpv-headers/mpv/
 
       - name: 🧱 Build WLX plugin bundle
         run: |
