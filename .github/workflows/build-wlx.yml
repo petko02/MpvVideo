@@ -1,4 +1,4 @@
-name: Build WLX Plugin (macOS ARM, FPC 3.3.1)
+name: Build WLX Plugin (macOS ARM, FPC 3.3.1 via GitHub Mirror)
 
 on:
   workflow_dispatch:
@@ -20,13 +20,12 @@ jobs:
             cp wlxplugin.pas sdk/wlxplugin.pas
           fi
 
-      - name: Install dependencies and bootstrap FPC
-        run: |
-          brew install fpc make git
+      - name: Install build dependencies
+        run: brew install fpc make git
 
-      - name: Download Free Pascal 3.3.1 source
+      - name: Download Free Pascal 3.3.1 (GitHub mirror)
         run: |
-          git clone https://gitlab.com/freepascal.org/fpc/source.git fpc-source
+          git clone --depth 1 https://github.com/graemeg/freepascal.git fpc-source
           cd fpc-source
           git checkout main
 
@@ -46,7 +45,11 @@ jobs:
         run: |
           mkdir -p release
           fpc -Fu./ -Fu./sdk -k"-bundle" -o"release/MpvVideo.wlx" MpvVideo.lpr
-          ls -lh release
+
+      - name: Code-sign the plugin
+        run: |
+          codesign --force --deep --sign - release/MpvVideo.wlx
+          codesign --verify release/MpvVideo.wlx
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
