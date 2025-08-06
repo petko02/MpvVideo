@@ -7,7 +7,7 @@ on:
       - main
 
 env:
-  FPCUP_VERSION: v2.2.0h
+  FPCUP_VERSION: v2.4.0j
 
 jobs:
   build:
@@ -35,6 +35,10 @@ jobs:
             https://github.com/LongDirtyAnimAlf/fpcupdeluxe/releases/download/${FPCUP_VERSION}/fpcupdeluxe-x86_64-linux
           chmod +x fpcupdeluxe
           file ./fpcupdeluxe
+          if ! file ./fpcupdeluxe | grep -q "executable"; then
+            echo "❌ fpcupdeluxe is not a valid binary!"
+            exit 1
+          fi
 
       - name: Build Darwin cross-compiler (Intel)
         run: |
