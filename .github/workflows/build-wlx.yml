@@ -18,10 +18,11 @@ jobs:
           brew update
           brew install mpv coreutils
 
-      - name: Download mpv headers (opengl_cb.h and client.h)
+      - name: Download mpv headers into mpv/ subfolder
         run: |
-          curl -L -o opengl_cb.h https://raw.githubusercontent.com/Ivshti/libmpv/master/include/mpv/opengl_cb.h
-          curl -L -o client.h     https://raw.githubusercontent.com/mpv-player/mpv/v0.40.0/include/mpv/client.h
+          mkdir -p mpv
+          curl -L -o mpv/opengl_cb.h https://raw.githubusercontent.com/Ivshti/libmpv/master/include/mpv/opengl_cb.h
+          curl -L -o mpv/client.h     https://raw.githubusercontent.com/mpv-player/mpv/v0.40.0/include/mpv/client.h
 
       - name: Prepare plugin directory
         run: mkdir -p MpvVideo.wlx
@@ -44,7 +45,7 @@ jobs:
         run: |
           mkdir -p release/MpvVideo
           cp MpvVideo.wlx/libmpvvideo.dylib release/MpvVideo/
-          cp *.h mpvvideo.mm README.md release/MpvVideo/ || true
+          cp -r mpv mpvvideo.mm README.md release/MpvVideo/ || true
           cd release && zip -r MpvVideo.zip MpvVideo
 
       - name: Upload artifact
