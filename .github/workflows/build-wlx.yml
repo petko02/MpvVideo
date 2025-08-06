@@ -1,4 +1,4 @@
-name: Build WLX Plugin (macOS ARM, FPC 3.3.1)
+name: Build WLX Plugin (macOS Intel, Pascal)
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout main repository
         uses: actions/checkout@v4
@@ -20,52 +20,22 @@ jobs:
             cp wlxplugin.pas sdk/wlxplugin.pas
           fi
 
-      - name: Install Developer Tools
+      - name: Install Free Pascal cross-compiler
         run: |
-          sudo xcode-select --install || true
-          export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
-          echo "SDKROOT=$SDKROOT" >> $GITHUB_ENV
+          sudo apt-get update
+          sudo apt-get install -y fp-compiler fpc-source
+          # Verify FPC
+          fpc -iW
 
-      - name: Install build dependencies
-        run: brew install fpc make git
-
-      - name: Configure Git for HTTP/1.1
-        run: git config --global http.version HTTP/1.1
-
-      - name: Download Free Pascal 3.3.1 (GitLab with retry)
-        run: |
-          for i in 1 2 3; do
-            git clone --depth 1 https://gitlab.com/freepascal.org/fpc/source.git fpc-source && break
-            echo "Retrying clone ($i)..."
-            sleep 10
-          done
-          cd fpc-source
-          git checkout main
-
-      - name: Generate Makefiles
-        run: |
-          cd fpc-source
-          fpcmake -Tall
-
-      - name: Build and install Free Pascal 3.3.1
-        run: |
-          cd fpc-source
-          make FPC=$(which fpc) CROSSOPT="-XR${SDKROOT}" all
-          sudo make CROSSOPT="-XR${SDKROOT}" install
-          fpc -iW  # Show installed version
-
-      - name: Build WLX plugin
+      - name: Cross-compile for macOS Intel
         run: |
           mkdir -p release
-          fpc -Fu./ -Fu./sdk -k"-bundle" -o"release/MpvVideo.wlx" MpvVideo.lpr
-
-      - name: Code-sign the plugin
-        run: |
-          codesign --force --deep --sign - release/MpvVideo.wlx
-          codesign --verify release/MpvVideo.wlx
+          fpc -Twin64 -Px86_64 -Fu./ -Fu./sdk -k"-bundle" \
+              -o"release/MpvVideo.wlx" MpvVideo.lpr
+          ls -lh release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MpvVideo-wlx-macos-arm
+          name: MpvVideo-wlx-macos-intel
           path: release/MpvVideo.wlx
