@@ -17,19 +17,31 @@ jobs:
       - name: Install mpv & tools
         run: |
           brew update
-          brew install mpv
+          brew install mpv        # provides libmpv.dylib :contentReference[oaicite:0]{index=0}
           brew install coreutils
+
+      - name: Vendor mpv C-API headers
+        run: |
+          # Grab mpv 0.40.0 source and pull only the needed headers :contentReference[oaicite:1]{index=1}
+          curl -L -o mpv.tar.gz \
+            https://github.com/mpv-player/mpv/archive/refs/tags/v0.40.0.tar.gz
+          tar -xzf mpv.tar.gz
+          mkdir -p mpv-headers/mpv
+          # libmpv/opengl_cb.h actually lives at top-level include/ on GitHub
+          cp mpv-0.40.0/include/opengl_cb.h mpv-headers/mpv/opengl_cb.h
+          # client.h and friends live in include/mpv/
+          cp mpv-0.40.0/include/mpv/*.h mpv-headers/mpv/
 
       - name: Prepare plugin dir
         run: mkdir -p MpvVideo.wlx
 
       - name: Compile Objective-C++
         run: |
-          # Use Homebrew’s top‐level prefix (Intel: /usr/local; ARM: /opt/homebrew)
-          PREFIX=$(brew --prefix)
+          # Link against Homebrew’s libmpv, include our vendored headers
+          PREFIX=$(brew --prefix mpv)
           clang++ -ObjC++ -Wall -O2 -fPIC \
             -I. \
-            -I"${PREFIX}/include" \
+            -Impv-headers \
             -L"${PREFIX}/lib" \
             -framework Cocoa \
             -framework QuartzCore \
