@@ -1,86 +1,62 @@
-name: Build MpvVideo WLX Plugin (macOS)
+name: Build WLX Plugin
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: macos-14
 
     steps:
-      - name: Checkout project
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Install dependencies
         run: |
           brew update
-          brew install \
-            coreutils \
-            pkg-config \
-            meson \
-            ninja \
-            jpeg \
-            uchardet \
-            lame \
-            dav1d \
-            ffmpeg \
-            python@3.11
+          brew install fpc meson ninja pkg-config jpeg uchardet wget
 
-      - name: Download mpv 0.34.0 source
+      - name: Download and extract mpv headers
         run: |
           curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.34.0.tar.gz
           tar -xzf mpv.tar.gz
-          mv mpv-0.34.0 mpv-source
+          mkdir -p mpv-headers
+          cp -r mpv-0.34.0/libmpv mpv-headers/
+          cp -r mpv-0.34.0/include/mpv mpv-headers/
 
-      - name: Patch waf distutils
+      - name: Set environment variables
         run: |
-          # PEP668 removed distutils from Python 3.12+
-          sed -i '' 's/from distutils.version import StrictVersion/from packaging.version import Version as StrictVersion/' mpv-source/waftools/checks/generic.py
-
-      - name: Build libmpv (shared)
-        working-directory: ./mpv-source
-        run: |
-          python3 ./bootstrap.py
-          ./waf configure --disable-cplayer --enable-libmpv-shared --prefix=$PWD/../mpv-local
-          ./waf build
-          ./waf install
-          echo "PKG_CONFIG_PATH=$GITHUB_WORKSPACE/mpv-local/lib/pkgconfig" >> $GITHUB_ENV
-          echo "DYLD_LIBRARY_PATH=$GITHUB_WORKSPACE/mpv-local/lib" >> $GITHUB_ENV
-
-      - name: Copy mpv headers
-        run: |
-          mkdir -p include/mpv
-          cp mpv-source/libmpv/client.h include/mpv/
-          cp mpv-source/video/out/opengl_cb.h include/mpv/
+          echo "C_INCLUDE_PATH=$PWD/mpv-headers:$C_INCLUDE_PATH" >> $GITHUB_ENV
+          echo "LIBRARY_PATH=$PWD/mpv-headers:$LIBRARY_PATH" >> $GITHUB_ENV
 
       - name: Patch BOOL typedef and detect function
         run: |
-          sed -i '' '1i\
-#ifndef __OBJC__\
-typedef int BOOL;\
-#endif' mpvvideo.c
+          # Insert BOOL typedef at the top if not already patched
+          if ! grep -q 'ifndef __OBJC__' mpvvideo.c; then
+            printf "#ifndef __OBJC__\ntypedef int BOOL;\n#endif\n" | cat - mpvvideo.c > temp && mv temp mpvvideo.c
+          fi
+
+          # Fix ListGetDetectString signature to match plugin header
           sed -i '' 's/int DCPCALL ListGetDetectString/void DCPCALL ListGetDetectString/' mpvvideo.c
 
       - name: Compile mpvvideo.c
         run: |
-          clang -Wall -O2 \
-            -Iinclude -Iinclude/mpv \
-            -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include \
-            -framework Cocoa \
-            -framework OpenGL \
-            -shared -fPIC \
-            -o release/MpvVideo/mpvvideo.wlx \
-            mpvvideo.c \
-            -Lmpv-local/lib -lmpv
+          mkdir -p release/MpvVideo
+          fpc -Mdelphi -Scgi -CX -XX -O2 -k"-framework" -kCocoa -k"-framework" -kOpenGL -k"-framework" -kQuartzCore \
+              -k"-framework" -kIOKit -k"-framework" -kCoreVideo -k"-framework" -kCoreFoundation \
+              -Fu. -FErelease/MpvVideo -oMpvVideo.wlx mpvvideo.c
 
-      - name: Copy libmpv.dylib
+      - name: Package release
         run: |
-          cp mpv-local/lib/libmpv.* release/MpvVideo/
+          cd release
+          zip -r MpvVideo-macOS.zip MpvVideo
+          cd ..
 
-      - name: Upload ZIP artifact
+      - name: Upload plugin ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: MpvVideo-Plugin
-          path: release/MpvVideo/
+          name: MpvVideo-macOS
+          path: release/MpvVideo-macOS.zip
