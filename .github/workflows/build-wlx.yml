@@ -23,7 +23,7 @@ jobs:
           curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.40.0.tar.gz
           tar -xzf mpv.tar.gz
           mkdir -p mpv-headers/mpv
-          cp -r mpv-0.40.0/libmpv/include/mpv/* mpv-headers/mpv/
+          cp -r mpv-0.40.0/include/mpv/* mpv-headers/mpv/
 
       - name: 🧱 Build WLX plugin bundle
         run: |
