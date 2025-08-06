@@ -12,23 +12,29 @@ typedef struct { uint32_t dwLowDateTime, dwHighDateTime; } FILETIME;
 #import "common.h"
 #import "wlxplugin.h"
 #import <mpv/client.h>
-#import <mpv/opengl_cb.h>  // when built with -I.
+#import <mpv/opengl_cb.h>
 
 #ifndef EXTENSIONS_MEDIA
 #define EXTENSIONS_MEDIA "*.mp4;*.mkv;*.avi;*.mov;*.webm"
 #endif
 
-#pragma mark –– OpenGL view for MPV
+#pragma mark –– Forward declarations
 
-// We still subclass NSOpenGLView, despite deprecation:
+void updateSeekPosition(void);
+void seekSliderMoved(NSSlider*);
+void playPausePressed(NSButton*);
+static void mpv_update_callback(void *ctx);
+
+#pragma mark –– OpenGL view
+
 @interface MpvGLView : NSOpenGLView
 @property (nonatomic, assign) mpv_opengl_cb_context *mpv_gl;
 @end
+
 @implementation MpvGLView
 - (void)drawRect:(NSRect)dirtyRect {
     if (self.mpv_gl) {
         NSRect r = self.bounds;
-        // 0 = default FBO, then width/height
         mpv_opengl_cb_draw(self.mpv_gl, 0, (int)r.size.width, (int)r.size.height);
     }
 }
@@ -95,61 +101,54 @@ void playPausePressed(NSButton *btn) {
     });
 }
 
-#pragma mark –– DCPCALL
+static void mpv_update_callback(void *ctx) {
+    MpvGLView *v = (__bridge MpvGLView*)ctx;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [v setNeedsDisplay:YES];
+    });
+}
+
+#pragma mark –– DCPCALL entry points
 
 HWND DCPCALL ListLoad(HWND parentWin, char* fileToLoad, int showFlags) {
     NSView *hostView = (__bridge NSView*)(void*)parentWin;
     NSRect frame     = hostView.bounds;
 
-    // 1) create and initialize MPV
+    // 1) init mpv
     mpv = mpv_create();
     mpv_initialize(mpv);
     mpv_set_option_string(mpv, "vo", "gpu");
 
-    // 2) get & init the OpenGL-CB sub-API
-    mpv_gl = mpv_get_sub_api(mpv, "opengl-cb");
-    // new signature: ctx, get_proc (NULL), get_proc_ctx (NULL), dpy_ctx (NULL)
+    // 2) opengl-cb sub-API
+    mpv_gl = mpv_get_sub_api(mpv, MPV_SUB_API_OPENGL_CB);
     mpv_opengl_cb_init_gl(mpv_gl, NULL, NULL, NULL);
 
-    // 3) set up the NSOpenGLView
+    // 3) set update callback
+    mpv_opengl_cb_set_update_callback(mpv_gl, mpv_update_callback, (__bridge void*)glView);
+
+    // 4) create GL view
     NSOpenGLPixelFormatAttribute attrs[] = {
       NSOpenGLPFAAccelerated,
       NSOpenGLPFAColorSize,   24,
       NSOpenGLPFADepthSize,    16,
       0
     };
-    NSOpenGLPixelFormat *fmt = [[NSOpenGLPixelFormat alloc]
-                                  initWithAttributes:attrs];
+    NSOpenGLPixelFormat *fmt = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
     glView = [[MpvGLView alloc] initWithFrame:frame pixelFormat:fmt];
     glView.mpv_gl = mpv_gl;
-    // update callback (C function)
-    mpv_opengl_cb_set_update_callback(
-      mpv_gl,
-      ^(void *ctx){
-        MpvGLView *v = (__bridge MpvGLView*)ctx;
-        dispatch_async(dispatch_get_main_queue(), ^{
-          [v setNeedsDisplay:YES];
-        });
-      },
-      (__bridge void*)glView
-    );
 
-    // 4) UI controls
+    // 5) controls
     controller   = [[MpvController alloc] init];
     seekSlider   = [[NSSlider alloc] initWithFrame:NSMakeRect(10,10,frame.size.width-20,20)];
-    seekSlider.minValue = 0;
-    seekSlider.maxValue = 100;
-    seekSlider.target   = controller;
-    seekSlider.action   = @selector(sliderChanged:);
-    [glView addSubview:seekSlider];
-
+    seekSlider.minValue = 0; seekSlider.maxValue = 100;
+    seekSlider.target   = controller; seekSlider.action   = @selector(sliderChanged:);
     playPauseBtn = [[NSButton alloc] initWithFrame:NSMakeRect(10,40,80,30)];
     [playPauseBtn setTitle:@"Pause"];
-    playPauseBtn.target = controller;
-    playPauseBtn.action = @selector(buttonClicked:);
+    playPauseBtn.target = controller; playPauseBtn.action = @selector(buttonClicked:);
+    [glView addSubview:seekSlider];
     [glView addSubview:playPauseBtn];
 
-    // 5) load file & start timer
+    // 6) load file + timer
     const char *cmd[] = {"loadfile", fileToLoad, NULL};
     mpv_command(mpv, cmd);
     [NSTimer scheduledTimerWithTimeInterval:1.0
@@ -158,7 +157,7 @@ HWND DCPCALL ListLoad(HWND parentWin, char* fileToLoad, int showFlags) {
                                    userInfo:nil
                                     repeats:YES];
 
-    // 6) embed
+    // 7) embed
     [hostView addSubview:glView];
     return (__bridge HWND)glView;
 }
