@@ -1,63 +1,40 @@
-name: Build WLX Plugin (macOS Embedded mpv 0.34)
+name: Build WLX Plugin (macOS, Embedded mpv)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: macos-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies (with Python 3.11)
+      - name: Install mpv
         run: |
           brew update
-          brew install python@3.11 pkg-config meson ninja ffmpeg \
-                       libass luajit jpeg uchardet
+          brew install mpv pkg-config
 
-          echo "/opt/homebrew/opt/python@3.11/bin" >> $GITHUB_PATH
-          python3.11 -m ensurepip
-          python3.11 -m pip install setuptools
-
-      - name: Download and build mpv 0.34
+      - name: Prepare headers and lib
         run: |
-          curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.34.0.tar.gz
-          tar -xzf mpv.tar.gz
-          cd mpv-0.34.0
-          /opt/homebrew/opt/python@3.11/bin/python3.11 ./bootstrap.py
-          /opt/homebrew/opt/python@3.11/bin/python3.11 ./waf configure \
-            --disable-cplayer --enable-libmpv-shared --prefix=$PWD/../mpv-local
-          /opt/homebrew/opt/python@3.11/bin/python3.11 ./waf build
-          /opt/homebrew/opt/python@3.11/bin/python3.11 ./waf install
-          cd ..
-          echo "PKG_CONFIG_PATH=$PWD/mpv-local/lib/pkgconfig" >> $GITHUB_ENV
-          echo "DYLD_LIBRARY_PATH=$PWD/mpv-local/lib" >> $GITHUB_ENV
-
-      - name: Patch BOOL typedef and Detect function
-        run: |
-          echo '#ifndef __OBJC__' > tmpfile
-          echo 'typedef int BOOL;' >> tmpfile
-          echo '#endif' >> tmpfile
-          cat mpvvideo.c >> tmpfile
-          mv tmpfile mpvvideo.c
-          sed -i '' 's/int DCPCALL ListGetDetectString/void DCPCALL ListGetDetectString/' mpvvideo.c
+          mkdir -p mpv-headers/mpv
+          cp $(brew --prefix mpv)/include/mpv/* mpv-headers/mpv/
+          mkdir -p release/MpvVideo
+          cp $(brew --prefix mpv)/lib/libmpv.dylib release/MpvVideo/
 
       - name: Build WLX plugin
         run: |
-          mkdir -p release/MpvVideo
           gcc -Wall -fPIC -ObjC -framework Cocoa \
-            -I./mpv-local/include \
+            -I./mpv-headers \
             -bundle -undefined dynamic_lookup \
             -o release/MpvVideo/MpvVideo.wlx \
             mpvvideo.c $(pkg-config --cflags --libs mpv)
 
-          cp mpv-local/lib/libmpv.dylib release/MpvVideo/
-          install_name_tool -change libmpv.dylib \
-            @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx || true
+          # Fix rpath so libmpv is found in plugin folder
+          install_name_tool -change $(brew --prefix mpv)/lib/libmpv.2.dylib \
+            @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx
 
       - name: Package plugin
         run: |
