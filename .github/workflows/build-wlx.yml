@@ -10,7 +10,7 @@ jobs:
   build:
     runs-on: macos-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout main repository
         uses: actions/checkout@v4
 
       - name: Prepare SDK folder
@@ -23,11 +23,13 @@ jobs:
       - name: Install build dependencies
         run: brew install fpc make git
 
-      - name: Download Free Pascal 3.3.1 (GitHub mirror)
-        run: |
-          git clone --depth 1 https://github.com/graemeg/freepascal.git fpc-source
-          cd fpc-source
-          git checkout main
+      - name: Clone Free Pascal 3.3.1 (GitHub mirror)
+        uses: actions/checkout@v4
+        with:
+          repository: graemeg/freepascal
+          ref: main
+          path: fpc-source
+          fetch-depth: 1
 
       - name: Generate Makefiles
         run: |
