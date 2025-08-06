@@ -32,9 +32,13 @@ jobs:
       - name: Configure Git for HTTP/1.1
         run: git config --global http.version HTTP/1.1
 
-      - name: Download Free Pascal 3.3.1 (GitLab)
+      - name: Download Free Pascal 3.3.1 (GitLab with retry)
         run: |
-          git clone --depth 1 https://gitlab.com/freepascal.org/fpc/source.git fpc-source
+          for i in 1 2 3; do
+            git clone --depth 1 https://gitlab.com/freepascal.org/fpc/source.git fpc-source && break
+            echo "Retrying clone ($i)..."
+            sleep 10
+          done
           cd fpc-source
           git checkout main
 
@@ -46,8 +50,8 @@ jobs:
       - name: Build and install Free Pascal 3.3.1
         run: |
           cd fpc-source
-          make FPC=$(which fpc) -XR=${SDKROOT} all
-          sudo make -XR=${SDKROOT} install
+          make FPC=$(which fpc) CROSSOPT="-XR${SDKROOT}" all
+          sudo make CROSSOPT="-XR${SDKROOT}" install
           fpc -iW  # Show installed version
 
       - name: Build WLX plugin
