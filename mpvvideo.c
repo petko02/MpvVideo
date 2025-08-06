@@ -1,92 +1,103 @@
+#define _GNU_SOURCE
 #include <Cocoa/Cocoa.h>
 #include <mpv/client.h>
 #include <mpv/opengl_cb.h>
 #include "wlxplugin.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <dlfcn.h>
 
-#ifndef __OBJC__
-typedef int BOOL;
-#endif
+typedef struct {
+    NSView *container;
+    NSView *videoView;
+    NSSlider *seekBar;
+    NSButton *playPauseBtn;
+    mpv_handle *mpv;
+    mpv_opengl_cb_context *mpvGL;
+    BOOL isPlaying;
+} MPVPanel;
 
-static mpv_handle *mpv = NULL;
-static mpv_opengl_cb_context *mpv_gl = NULL;
-static NSView *videoView = nil;
-static NSSlider *seekSlider = nil;
-static NSButton *playPauseButton = nil;
-static BOOL isPaused = NO;
+static void *load_mpv_dylib(void) {
+    Dl_info info;
+    if (dladdr((void*)load_mpv_dylib, &info) == 0) return NULL;
 
-@interface MPVView : NSOpenGLView
-@end
+    char dylibPath[1024];
+    snprintf(dylibPath, sizeof(dylibPath), "%s/libmpv.dylib", dirname((char*)info.dli_fname));
 
-@implementation MPVView
-- (void)drawRect:(NSRect)dirtyRect {
-    if (mpv_gl) {
-        mpv_opengl_cb_draw(mpv_gl, 0, self.bounds.size.width, -self.bounds.size.height);
+    return dlopen(dylibPath, RTLD_NOW | RTLD_GLOBAL);
+}
+
+static void on_mpv_render(void *ctx) {
+    MPVPanel *panel = (MPVPanel *)ctx;
+    if (panel->mpvGL) {
+        mpv_opengl_cb_draw(panel->mpvGL, 0, panel->container.bounds.size.width,
+                           panel->container.bounds.size.height);
+        glFlush();
     }
-}
-@end
-
-static void on_mpv_render_update(void *ctx) {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [videoView setNeedsDisplay:YES];
-    });
-}
-
-static void togglePlayPause(id sender) {
-    isPaused = !isPaused;
-    mpv_command_string(mpv, isPaused ? "set pause yes" : "set pause no");
-    [playPauseButton setTitle:(isPaused ? @"▶️" : @"⏸️")];
-}
-
-static void seekPosition(id sender) {
-    double pos = [seekSlider doubleValue];
-    char cmd[64];
-    snprintf(cmd, sizeof(cmd), "seek %f absolute", pos);
-    mpv_command_string(mpv, cmd);
 }
 
 HWND DCPCALL ListLoad(HWND ParentWin, char* FileToLoad, int ShowFlags) {
-    if (!mpv) {
-        mpv = mpv_create();
-        mpv_initialize(mpv);
+    if (!load_mpv_dylib()) {
+        NSLog(@"Failed to load bundled libmpv.dylib");
+        return NULL;
     }
 
-    NSRect rect = NSMakeRect(0, 0, 400, 300);
-    videoView = [[MPVView alloc] initWithFrame:rect];
+    MPVPanel *panel = calloc(1, sizeof(MPVPanel));
 
-    NSOpenGLContext *glContext = [videoView openGLContext];
-    mpv_gl = mpv_get_sub_api(mpv, MPV_SUB_API_OPENGL_CB);
-    mpv_opengl_cb_init_gl(mpv_gl, NULL, NULL);
-    mpv_opengl_cb_set_update_callback(mpv_gl, on_mpv_render_update, NULL);
+    NSView *parent = (__bridge NSView *)ParentWin;
+    NSRect bounds = parent.bounds;
 
-    const char *cmd[] = {"loadfile", FileToLoad, NULL};
-    mpv_command(mpv, cmd);
+    panel->container = [[NSView alloc] initWithFrame:bounds];
+    [parent addSubview:panel->container];
 
-    // Play/Pause button
-    playPauseButton = [[NSButton alloc] initWithFrame:NSMakeRect(10, 10, 50, 24)];
-    [playPauseButton setTitle:@"⏸️"];
-    [playPauseButton setTarget:NSApp];
-    [playPauseButton setAction:@selector(togglePlayPause:)];
-    [videoView addSubview:playPauseButton];
+    panel->videoView = [[NSView alloc] initWithFrame:NSMakeRect(0, 40, bounds.size.width, bounds.size.height - 40)];
+    [panel->container addSubview:panel->videoView];
 
-    // Seek slider
-    seekSlider = [[NSSlider alloc] initWithFrame:NSMakeRect(70, 10, 300, 24)];
-    [seekSlider setMinValue:0];
-    [seekSlider setMaxValue:100];
-    [seekSlider setTarget:NSApp];
-    [seekSlider setAction:@selector(seekPosition:)];
-    [videoView addSubview:seekSlider];
+    panel->seekBar = [[NSSlider alloc] initWithFrame:NSMakeRect(10, 10, bounds.size.width - 100, 20)];
+    [panel->container addSubview:panel->seekBar];
 
-    return (HWND)videoView;
+    panel->playPauseBtn = [[NSButton alloc] initWithFrame:NSMakeRect(bounds.size.width - 80, 5, 70, 30)];
+    [panel->playPauseBtn setTitle:@"Pause"];
+    [panel->playPauseBtn setButtonType:NSButtonTypeMomentaryPushIn];
+    [panel->container addSubview:panel->playPauseBtn];
+
+    // Initialize mpv
+    panel->mpv = mpv_create();
+    mpv_set_option_string(panel->mpv, "vo", "libmpv");
+    mpv_initialize(panel->mpv);
+
+    panel->mpvGL = mpv_get_sub_api(panel->mpv, MPV_SUB_API_OPENGL_CB);
+    mpv_opengl_cb_set_update_callback(panel->mpvGL, on_mpv_render, panel);
+
+    NSOpenGLPixelFormatAttribute attrs[] = { NSOpenGLPFAAccelerated, 0 };
+    NSOpenGLPixelFormat *fmt = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
+    NSOpenGLContext *glCtx = [[NSOpenGLContext alloc] initWithFormat:fmt shareContext:nil];
+
+    mpv_opengl_cb_init_gl(panel->mpvGL, NULL, NULL);
+    [glCtx makeCurrentContext];
+
+    const char *cmd[] = { "loadfile", FileToLoad, NULL };
+    mpv_command(panel->mpv, cmd);
+    panel->isPlaying = YES;
+
+    return (HWND)CFBridgingRetain(panel);
 }
 
 void DCPCALL ListCloseWindow(HWND ListWin) {
-    if (mpv) {
-        mpv_terminate_destroy(mpv);
-        mpv = NULL;
-    }
+    MPVPanel *panel = (__bridge_transfer MPVPanel *)ListWin;
+    if (!panel) return;
+
+    mpv_opengl_cb_uninit_gl(panel->mpvGL);
+    mpv_terminate_destroy(panel->mpv);
+
+    [panel->videoView removeFromSuperview];
+    [panel->seekBar removeFromSuperview];
+    [panel->playPauseBtn removeFromSuperview];
+    [panel->container removeFromSuperview];
+    free(panel);
 }
 
 void DCPCALL ListGetDetectString(char* DetectString, int maxlen) {
-    snprintf(DetectString, maxlen,
-             "EXT=\"MP4\" | EXT=\"MKV\" | EXT=\"AVI\" | EXT=\"MOV\" | EXT=\"WMV\" | EXT=\"M4V\" | EXT=\"FLV\"");
+    strncpy(DetectString, "EXT=\"MP4|MKV|AVI|MOV|WMV|FLV|WEBM|MPEG|MPG|3GP|TS\"", maxlen);
 }
