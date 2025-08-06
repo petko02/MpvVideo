@@ -23,14 +23,19 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y curl build-essential git binutils-mingw-w64-x86-64 \
+          sudo apt-get install -y wget build-essential git binutils-mingw-w64-x86-64 \
               libgtk2.0-dev libpango1.0-dev libglib2.0-dev libx11-dev
 
       - name: Download fpcupdeluxemini
         run: |
-          curl -L -o fpcupdeluxemini \
+          wget -O fpcupdeluxemini \
             https://github.com/LongDirtyAnimAlf/fpcupdeluxe/releases/latest/download/fpcupdeluxemini-x86_64-linux
           chmod +x fpcupdeluxemini
+          file ./fpcupdeluxemini
+          if ! file ./fpcupdeluxemini | grep -q "executable"; then
+            echo "❌ fpcupdeluxemini is not a valid binary!"
+            exit 1
+          fi
 
       - name: Build Darwin cross-compiler (Intel)
         run: |
