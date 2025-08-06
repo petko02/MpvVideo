@@ -1,4 +1,4 @@
-name: Build WLX Plugin (macOS Intel, Pascal)
+name: Build WLX Plugin (macOS Intel via Cross-Compiler)
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout main repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Prepare SDK folder
@@ -20,18 +20,37 @@ jobs:
             cp wlxplugin.pas sdk/wlxplugin.pas
           fi
 
-      - name: Install Free Pascal cross-compiler
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y fp-compiler fpc-source
-          # Verify FPC
-          fpc -iW
+          sudo apt-get install -y curl build-essential git binutils-mingw-w64-x86-64 \
+              libgtk2.0-dev libpango1.0-dev libglib2.0-dev libx11-dev
 
-      - name: Cross-compile for macOS Intel
+      - name: Download fpcupdeluxe
+        run: |
+          curl -L -o fpcupdeluxe https://github.com/LongDirtyAnimAlf/fpcupdeluxe/releases/latest/download/fpcupdeluxe-x86_64-linux
+          chmod +x fpcupdeluxe
+
+      - name: Build Darwin cross-compiler (Intel)
+        run: |
+          ./fpcupdeluxe --fpcURL=https://gitlab.com/freepascal.org/fpc/source.git \
+                        --lazURL=https://gitlab.com/freepascal.org/lazarus/lazarus.git \
+                        --crossall darwin \
+                        --installdir=$HOME/fpcup
+          echo "$HOME/fpcup/cross/bin/x86_64-darwin" >> $GITHUB_PATH
+          echo "$HOME/fpcup/bin/x86_64-linux" >> $GITHUB_PATH
+
+      - name: Verify cross-compiler
+        run: |
+          $HOME/fpcup/bin/x86_64-linux/fpc -iW
+          ls -R $HOME/fpcup/cross/lib | grep darwin || true
+
+      - name: Cross-compile WLX plugin for macOS Intel
         run: |
           mkdir -p release
-          fpc -Twin64 -Px86_64 -Fu./ -Fu./sdk -k"-bundle" \
-              -o"release/MpvVideo.wlx" MpvVideo.lpr
+          $HOME/fpcup/bin/x86_64-linux/fpc -Tdarwin -Px86_64 \
+            -Fu./ -Fu./sdk -k"-bundle" \
+            -o"release/MpvVideo.wlx" MpvVideo.lpr
           ls -lh release
 
       - name: Upload artifact
