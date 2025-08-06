@@ -1,4 +1,4 @@
-name: Build MpvVideo.wlx
+name: Build MpvVideo WLX Plugin
 
 on:
   push:
@@ -13,59 +13,52 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Homebrew dependencies
+      - name: Install dependencies
         run: |
-          brew install fpc fpc-src lcl lazarus pkg-config meson ninja jpeg uchardet python@3.11
+          brew install fpc pkg-config meson ninja jpeg uchardet
 
-      - name: Add Python 3.11 to PATH
-        run: echo "/opt/homebrew/opt/python@3.11/bin" >> $GITHUB_PATH
-
-      - name: Download and extract mpv source (v0.34.0)
+      - name: Download and build mpv (libmpv)
         run: |
           curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.34.0.tar.gz
           tar -xzf mpv.tar.gz
-
-      - name: Build libmpv (shared)
-        run: |
           cd mpv-0.34.0
-          /opt/homebrew/opt/python@3.11/bin/python3 ./bootstrap.py
+
+          curl -O https://waf.io/waf-2.0.20
+          chmod +x waf
+
+          # Patch distutils issue in Python 3.12+
+          pipx install setuptools
+
           ./waf configure --disable-cplayer --enable-libmpv-shared --prefix=$PWD/../mpv-local
           ./waf build
           ./waf install
           cd ..
+
           echo "PKG_CONFIG_PATH=$PWD/mpv-local/lib/pkgconfig" >> $GITHUB_ENV
           echo "DYLD_LIBRARY_PATH=$PWD/mpv-local/lib" >> $GITHUB_ENV
 
-      - name: Copy mpv headers
-        run: |
-          mkdir -p headers/mpv
-          cp mpv-0.34.0/libmpv/client.h headers/mpv/
-          cp mpv-0.34.0/video/out/opengl/opengl_cb.h headers/mpv/
-
       - name: Patch BOOL typedef and detect function
         run: |
-          sed -i '' '1i\
-#ifndef __OBJC__\
-typedef int BOOL;\
-#endif' mpvvideo.c
+          # Add BOOL workaround if not using Objective-C
+          sed -i '' '1s;^;#ifndef __OBJC__\n#include <stdbool.h>\ntypedef int BOOL;\n#endif\n;' mpvvideo.c
+
+          # Fix incorrect return type
           sed -i '' 's/int DCPCALL ListGetDetectString/void DCPCALL ListGetDetectString/' mpvvideo.c
 
-      - name: Compile WLX plugin
+      - name: Compile plugin
         run: |
-          fpc -Fuheaders -Fuheaders/mpv -MObjFPC -Scgi -O2 -k"-framework Cocoa" mpvvideo.pas
+          fpc -B -Twin64 -Mdelphi -k"-framework Cocoa" mpvvideo.dpr
 
-      - name: Create release package
+      - name: Create release folder and copy plugin
         run: |
           mkdir -p release/MpvVideo
           cp mpvvideo.wlx release/MpvVideo/
-          cp mpvvideo.ini release/MpvVideo/
-          cp mpvvideo.c release/MpvVideo/
-          cp mpvvideo.pas release/MpvVideo/
-          cp -r headers release/MpvVideo/
-          cp mpv-local/lib/libmpv.* release/MpvVideo/
+          cp mpv-local/lib/libmpv.dylib release/MpvVideo/
+          cp README.md release/MpvVideo/
+          cp LICENSE release/MpvVideo/
 
-      - name: Upload build artifact
+      - name: Upload release ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: MpvVideo.wlx
+          name: MpvVideo_WLX
           path: release/MpvVideo
