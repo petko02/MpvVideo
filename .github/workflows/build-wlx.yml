@@ -17,17 +17,20 @@ jobs:
       - name: Install mpv & tools
         run: |
           brew update
-          brew install mpv        # provides libmpv.dylib
+          brew install mpv        # provides libmpv.dylib :contentReference[oaicite:0]{index=0}
           brew install coreutils
 
-      - name: Download & vendor mpv C-API headers
+      - name: Vendor just the two libmpv headers
         run: |
-          curl -L -o mpv.tar.gz \
-            https://github.com/mpv-player/mpv/archive/refs/tags/v0.40.0.tar.gz
-          tar -xzf mpv.tar.gz
           mkdir -p mpv-headers/mpv
-          # Copy only the headers under include/mpv (client.h, opengl_cb.h, etc.)
-          cp mpv-0.40.0/include/mpv/*.h mpv-headers/mpv/
+          # Grab client.h from mpv v0.40.0 release
+          curl -L \
+            https://raw.githubusercontent.com/mpv-player/mpv/v0.40.0/include/mpv/client.h \
+            -o mpv-headers/mpv/client.h
+          # Grab opengl_cb.h from the same release
+          curl -L \
+            https://raw.githubusercontent.com/mpv-player/mpv/v0.40.0/libmpv/opengl_cb.h \
+            -o mpv-headers/mpv/opengl_cb.h
 
       - name: Prepare plugin dir
         run: mkdir -p MpvVideo.wlx
