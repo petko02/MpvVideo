@@ -1,40 +1,48 @@
-name: Build WLX Plugin (macOS, Embedded mpv)
+name: Build WLX Plugin (macOS embedded mpv)
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: macos-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install mpv
+      - name: Install dependencies
         run: |
           brew update
-          brew install mpv pkg-config
+          brew install pkg-config ffmpeg
 
-      - name: Prepare headers and lib
+      - name: Download mpv 0.35.1
         run: |
-          mkdir -p mpv-headers/mpv
-          cp $(brew --prefix mpv)/include/mpv/* mpv-headers/mpv/
+          curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.35.1.tar.gz
+          tar -xzf mpv.tar.gz
+          cd mpv-0.35.1
+          ./bootstrap.py
+          ./waf configure --disable-cplayer --enable-libmpv-shared --prefix=$PWD/../mpv-local
+          ./waf build
+          ./waf install
+          cd ..
+          echo "PKG_CONFIG_PATH=$PWD/mpv-local/lib/pkgconfig" >> $GITHUB_ENV
+          echo "DYLD_LIBRARY_PATH=$PWD/mpv-local/lib" >> $GITHUB_ENV
+
+      - name: Build plugin
+        run: |
           mkdir -p release/MpvVideo
-          cp $(brew --prefix mpv)/lib/libmpv.dylib release/MpvVideo/
-
-      - name: Build WLX plugin
-        run: |
           gcc -Wall -fPIC -ObjC -framework Cocoa \
-            -I./mpv-headers \
             -bundle -undefined dynamic_lookup \
+            -I./mpv-local/include \
             -o release/MpvVideo/MpvVideo.wlx \
-            mpvvideo.c $(pkg-config --cflags --libs mpv)
-
-          # Fix rpath so libmpv is found in plugin folder
-          install_name_tool -change $(brew --prefix mpv)/lib/libmpv.2.dylib \
-            @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx
+            mpvvideo.c \
+            $(pkg-config --cflags --libs $PWD/mpv-local/lib/pkgconfig/mpv.pc)
+          cp mpv-local/lib/libmpv.dylib release/MpvVideo/
+          install_name_tool -change libmpv.2.dylib \
+              @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx
 
       - name: Package plugin
         run: |
