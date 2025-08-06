@@ -1,4 +1,4 @@
-name: Build WLX Plugin (Embedded mpv, macOS)
+name: Build WLX Plugin (Mpv embedded, macOS)
 
 on:
   workflow_dispatch:
@@ -13,20 +13,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install mpv and pkg-config
+      - name: Install dependencies
         run: |
+          brew update
           brew install mpv pkg-config
 
-      - name: Clone mpv source and extract headers
+      - name: Download mpv v0.34.0 and extract headers
         run: |
-          git clone --depth=1 https://github.com/mpv-player/mpv.git mpv-source
+          curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.34.0.tar.gz
+          tar -xzf mpv.tar.gz
           mkdir -p mpv-headers/mpv
-          cp mpv-source/include/mpv/client.h mpv-headers/mpv/
-          cp mpv-source/include/mpv/opengl_cb.h mpv-headers/mpv/
-          echo "Copied headers:"
-          find mpv-headers/mpv
+          cp mpv-0.34.0/libmpv/client.h mpv-headers/mpv/
+          cp mpv-0.34.0/libmpv/opengl_cb.h mpv-headers/mpv/
 
-      - name: Build plugin with embedded libmpv
+      - name: Build WLX plugin
         run: |
           mkdir -p release/MpvVideo
           gcc -Wall -fPIC -ObjC -framework Cocoa \
@@ -35,20 +35,17 @@ jobs:
             -o release/MpvVideo/MpvVideo.wlx \
             mpvvideo.c $(pkg-config --cflags --libs mpv)
 
-          # Copy dynamic libmpv.dylib to same folder
           cp $(brew --prefix)/lib/libmpv.dylib release/MpvVideo/
-
-          # Relink libmpv.dylib path to local directory
           install_name_tool -change libmpv.dylib \
               @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx || true
 
-      - name: Package WLX Plugin
+      - name: Package plugin
         run: |
           cd release
           zip -r MpvVideo-macos-embedded.zip MpvVideo
           cd ..
 
-      - name: Upload Artifact
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: MpvVideo-wlx-macos-embedded
