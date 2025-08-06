@@ -1,4 +1,4 @@
-name: Build WLX Plugin (macOS Embedded mpv + Seek Bar)
+name: Build WLX Plugin (macOS Embedded mpv 0.34 + Seek Bar)
 
 on:
   push:
@@ -13,12 +13,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install mpv and tools
+      - name: Tap and Install mpv 0.34
         run: |
           brew update
-          brew install mpv pkg-config
+          brew tap mpv-player/mpv
+          brew extract --version=0.34 mpv mpv-player/mpv || true
+          brew install mpv@0.34 || true
 
-      - name: Download older mpv (with opengl_cb.h)
+      - name: Download mpv 0.34 headers
         run: |
           curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.34.0.tar.gz
           tar -xzf mpv.tar.gz
@@ -44,10 +46,10 @@ jobs:
             -I./mpv-headers \
             -bundle -undefined dynamic_lookup \
             -o release/MpvVideo/MpvVideo.wlx \
-            mpvvideo.c $(pkg-config --cflags --libs mpv)
+            mpvvideo.c $(pkg-config --cflags --libs mpv@0.34 || pkg-config --cflags --libs mpv)
 
-          # Copy libmpv to make plugin self-contained
-          cp $(brew --prefix mpv)/lib/libmpv.dylib release/MpvVideo/
+          # Copy the matching libmpv
+          cp $(brew --prefix mpv@0.34)/lib/libmpv.dylib release/MpvVideo/ || cp $(brew --prefix mpv)/lib/libmpv.dylib release/MpvVideo/
           install_name_tool -change libmpv.dylib \
             @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx || true
 
