@@ -6,6 +6,9 @@ on:
     branches:
       - main
 
+env:
+  FPCUP_VERSION: v2.2.0h
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -29,7 +32,7 @@ jobs:
       - name: Download fpcupdeluxemini
         run: |
           wget -O fpcupdeluxemini \
-            https://github.com/LongDirtyAnimAlf/fpcupdeluxe/releases/latest/download/fpcupdeluxemini-x86_64-linux
+            https://github.com/LongDirtyAnimAlf/fpcupdeluxe/releases/download/${FPCUP_VERSION}/fpcupdeluxemini-x86_64-linux
           chmod +x fpcupdeluxemini
           file ./fpcupdeluxemini
           if ! file ./fpcupdeluxemini | grep -q "executable"; then
