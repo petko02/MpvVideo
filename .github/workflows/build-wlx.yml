@@ -3,8 +3,7 @@ name: Build WLX Plugin (Embedded mpv, macOS)
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
   build:
@@ -14,37 +13,39 @@ jobs:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🍺 Install mpv and development headers
+      - name: 🍺 Install mpv runtime
         run: |
           brew update
-          brew install mpv
-          brew tap mpv-player/mpv
-          brew install libmpv
+          brew install mpv pkg-config
+
+      - name: 📦 Download and extract mpv headers
+        run: |
+          curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.40.0.tar.gz
+          tar -xzf mpv.tar.gz
+          mkdir -p mpv-headers/mpv
+          cp -r mpv-0.40.0/libmpv/include/mpv/* mpv-headers/mpv/
 
       - name: 🧱 Build WLX plugin bundle
         run: |
           mkdir -p release/MpvVideo
-
           gcc -Wall -fPIC -ObjC -framework Cocoa \
-            -I"$(brew --prefix)/include" \
+            -I./mpv-headers \
             -bundle -undefined dynamic_lookup \
             -o release/MpvVideo/MpvVideo.wlx \
             mpvvideo.c $(pkg-config --cflags --libs mpv)
 
-          # Embed libmpv.dylib for standalone use
-          cp "$(brew --prefix)/lib/libmpv.dylib" release/MpvVideo/
-
-          # Fix the dynamic library path for portability
+          # Embed libmpv.dylib for portable use
+          cp $(brew --prefix)/lib/libmpv.dylib release/MpvVideo/
           install_name_tool -change libmpv.dylib \
-            @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx
+              @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx || true
 
-      - name: 📦 Package plugin as ZIP
+      - name: 📦 Package plugin
         run: |
           cd release
           zip -r MpvVideo-macos-embedded.zip MpvVideo
           cd ..
 
-      - name: 🚀 Upload plugin artifact
+      - name: 🚀 Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: MpvVideo-wlx-macos-embedded
