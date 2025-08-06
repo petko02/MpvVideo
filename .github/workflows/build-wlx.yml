@@ -11,21 +11,19 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: Install dependencies
         run: |
           brew update
           brew install mpv coreutils
 
-      - name: Prepare plugin directory
+      - name: Prepare plugin dir
         run: mkdir -p MpvVideo.wlx
 
       - name: Compile Objective-C++
         run: |
-          # Point at the mpv formula’s include/lib dirs so clang finds opengl_cb.h
-          PREFIX=$(brew --prefix mpv)
+          PREFIX=$(brew --prefix)
           clang++ -ObjC++ -Wall -O2 -fPIC \
             -I. \
             -I"${PREFIX}/include" \
@@ -33,9 +31,9 @@ jobs:
             -framework Cocoa \
             -framework QuartzCore \
             -framework OpenGL \
-            -lmpv \
-            -dynamiclib mpvvideo.mm \
-            -o MpvVideo.wlx/libmpvvideo.dylib
+            mpvvideo.mm \
+            -dynamiclib -o MpvVideo.wlx/libmpvvideo.dylib \
+            -lmpv
 
       - name: Package for release
         run: |
@@ -45,8 +43,7 @@ jobs:
           cp README.md release/MpvVideo/      || true
           cd release && zip -r MpvVideo.zip MpvVideo
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: MpvVideo
           path: release/MpvVideo.zip
