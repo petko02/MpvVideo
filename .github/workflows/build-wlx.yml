@@ -1,35 +1,59 @@
-name: Build WLX MpvVideo Plugin
+name: Build MpvVideo WLX Plugin (macOS)
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: macos-14
 
     steps:
-      - name: Checkout repository
+      - name: Checkout project
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install build dependencies
         run: |
-          brew install fpc fpcsrc fp-units-cocoa jpeg sdl2 uchardet pkg-config meson ninja
+          brew update
+          brew install \
+            coreutils \
+            pkg-config \
+            meson \
+            ninja \
+            jpeg \
+            uchardet \
+            lame \
+            dav1d \
+            ffmpeg \
+            python@3.11
 
-      - name: Download and build mpv (libmpv)
+      - name: Download mpv 0.34.0 source
         run: |
           curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.34.0.tar.gz
           tar -xzf mpv.tar.gz
-          cd mpv-0.34.0
-          curl -O https://waf.io/waf-2.0.20
-          chmod +x waf
+          mv mpv-0.34.0 mpv-source
+
+      - name: Patch waf distutils
+        run: |
+          # PEP668 removed distutils from Python 3.12+
+          sed -i '' 's/from distutils.version import StrictVersion/from packaging.version import Version as StrictVersion/' mpv-source/waftools/checks/generic.py
+
+      - name: Build libmpv (shared)
+        working-directory: ./mpv-source
+        run: |
+          python3 ./bootstrap.py
           ./waf configure --disable-cplayer --enable-libmpv-shared --prefix=$PWD/../mpv-local
           ./waf build
           ./waf install
-          cd ..
-          echo "PKG_CONFIG_PATH=$PWD/mpv-local/lib/pkgconfig" >> $GITHUB_ENV
-          echo "DYLD_LIBRARY_PATH=$PWD/mpv-local/lib" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$GITHUB_WORKSPACE/mpv-local/lib/pkgconfig" >> $GITHUB_ENV
+          echo "DYLD_LIBRARY_PATH=$GITHUB_WORKSPACE/mpv-local/lib" >> $GITHUB_ENV
+
+      - name: Copy mpv headers
+        run: |
+          mkdir -p include/mpv
+          cp mpv-source/libmpv/client.h include/mpv/
+          cp mpv-source/video/out/opengl_cb.h include/mpv/
 
       - name: Patch BOOL typedef and detect function
         run: |
@@ -39,21 +63,24 @@ typedef int BOOL;\
 #endif' mpvvideo.c
           sed -i '' 's/int DCPCALL ListGetDetectString/void DCPCALL ListGetDetectString/' mpvvideo.c
 
-      - name: Compile WLX plugin
+      - name: Compile mpvvideo.c
         run: |
-          fpc -k"-rpath @loader_path" -Flmpv-local/lib -k"-Fmpv-local/lib" \
-              -k"-framework Cocoa" -k"-framework OpenGL" -Xr -oMpvVideo.wlx mpvvideo.c
+          clang -Wall -O2 \
+            -Iinclude -Iinclude/mpv \
+            -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include \
+            -framework Cocoa \
+            -framework OpenGL \
+            -shared -fPIC \
+            -o release/MpvVideo/mpvvideo.wlx \
+            mpvvideo.c \
+            -Lmpv-local/lib -lmpv
 
-      - name: Create release folder and copy artifacts
+      - name: Copy libmpv.dylib
         run: |
-          mkdir -p release/MpvVideo
-          cp MpvVideo.wlx release/MpvVideo/
-          cp -R mpv-local/lib/libmpv.* release/MpvVideo/
-          cp README.md release/MpvVideo/ || true
-          cp LICENSE release/MpvVideo/ || true
+          cp mpv-local/lib/libmpv.* release/MpvVideo/
 
-      - name: Upload release ZIP
+      - name: Upload ZIP artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MpvVideo-wlx-macos
-          path: release/MpvVideo
+          name: MpvVideo-Plugin
+          path: release/MpvVideo/
