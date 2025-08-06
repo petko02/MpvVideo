@@ -20,15 +20,18 @@ jobs:
             cp wlxplugin.pas sdk/wlxplugin.pas
           fi
 
-      - name: Install Free Pascal cross-compiler
+      - name: Install Free Pascal and cross-binutils
         run: |
           sudo apt-get update
-          sudo apt-get install -y fp-compiler ppcrossx64-darwin
+          sudo apt-get install -y fp-compiler binutils-multiarch
+          # Create symlink for Darwin cross assembler/linker
+          sudo ln -s /usr/bin/x86_64-linux-gnu-as /usr/local/bin/x86_64-darwin-as
+          sudo ln -s /usr/bin/x86_64-linux-gnu-ld /usr/local/bin/x86_64-darwin-ld
 
-      - name: Build WLX plugin for macOS Intel
+      - name: Cross-compile WLX plugin
         run: |
           mkdir -p release
-          ppcrossx64-darwin -Fu./ -Fu./sdk -k"-bundle" -o"release/MpvVideo.wlx" MpvVideo.lpr
+          ppcx64 -Twin64 -Px86_64 -Fu./ -Fu./sdk -k"-bundle" -o"release/MpvVideo.wlx" MpvVideo.lpr
           ls -lh release
 
       - name: Upload artifact
