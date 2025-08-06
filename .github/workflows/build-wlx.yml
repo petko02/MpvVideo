@@ -1,10 +1,9 @@
-name: Build WLX Plugin (Embedded mpv, macOS)
+name: Build WLX Plugin (Embedded mpv, macOS GUI)
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
   build:
@@ -23,11 +22,10 @@ jobs:
           curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.40.0.tar.gz
           tar -xzf mpv.tar.gz
           mkdir -p mpv-headers/mpv
-          # Dynamically find and copy the needed headers
-          find mpv-0.40.0 -name "client.h" -exec cp {} mpv-headers/mpv/ \;
-          find mpv-0.40.0 -name "opengl_cb.h" -exec cp {} mpv-headers/mpv/ \;
-          echo "Copied headers:"
-          ls -l mpv-headers/mpv
+          find mpv-0.40.0 -type f \( -name "client.h" -o -name "opengl_cb.h" -o -name "bstr.h" \) \
+            -exec cp {} mpv-headers/mpv/ \;
+          echo "Headers copied to mpv-headers/mpv:"
+          ls -1 mpv-headers/mpv
 
       - name: Build WLX plugin bundle
         run: |
