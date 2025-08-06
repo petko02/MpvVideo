@@ -1,4 +1,4 @@
-name: Build WLX Plugin (macOS Universal)
+name: Build WLX Plugin (macOS ARM, FPC 3.3.1)
 
 on:
   workflow_dispatch:
@@ -20,21 +20,31 @@ jobs:
             cp wlxplugin.pas sdk/wlxplugin.pas
           fi
 
-      - name: Install Free Pascal
-        run: brew install fpc
+      - name: Install build dependencies
+        run: |
+          brew install make git
 
-      - name: Build WLX plugin (ARM)
+      - name: Download Free Pascal 3.3.1 source
+        run: |
+          git clone https://gitlab.com/freepascal.org/fpc/source.git fpc-source
+          cd fpc-source
+          git checkout main
+
+      - name: Bootstrap FPC (build ARM compiler)
+        run: |
+          cd fpc-source
+          make all
+          sudo make install
+          fpc -iW  # Verify compiler version
+
+      - name: Build WLX plugin with FPC 3.3.1
         run: |
           mkdir -p release
-          fpc -Fu./ -Fu./sdk -k"-bundle" -o"release/MpvVideo_arm.wlx" MpvVideo.lpr
-
-      - name: Duplicate ARM build as Universal
-        run: |
-          # Copy ARM binary as fallback (Rosetta can run ARM on M1)
-          cp release/MpvVideo_arm.wlx release/MpvVideo_universal.wlx
+          fpc -Fu./ -Fu./sdk -k"-bundle" -o"release/MpvVideo.wlx" MpvVideo.lpr
+          ls -lh release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MpvVideo-wlx-macos-universal
-          path: release/MpvVideo_universal.wlx
+          name: MpvVideo-wlx-macos-arm
+          path: release/MpvVideo.wlx
