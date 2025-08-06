@@ -14,10 +14,12 @@ jobs:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🍺 Install mpv and build tools
+      - name: 🍺 Install mpv and development headers
         run: |
           brew update
-          brew install mpv pkg-config
+          brew install mpv
+          brew tap mpv-player/mpv
+          brew install libmpv
 
       - name: 🧱 Build WLX plugin bundle
         run: |
@@ -32,7 +34,7 @@ jobs:
           # Embed libmpv.dylib for standalone use
           cp "$(brew --prefix)/lib/libmpv.dylib" release/MpvVideo/
 
-          # Rewrite dylib path to use relative location
+          # Fix the dynamic library path for portability
           install_name_tool -change libmpv.dylib \
             @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx
 
