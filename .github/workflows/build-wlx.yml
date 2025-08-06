@@ -1,4 +1,4 @@
-name: Build WLX Plugin (macOS embedded mpv)
+name: Build WLX Plugin (macOS Embedded mpv)
 
 on:
   workflow_dispatch:
@@ -16,13 +16,18 @@ jobs:
       - name: Install dependencies
         run: |
           brew update
-          brew install pkg-config ffmpeg
+          brew install pkg-config
 
-      - name: Download mpv 0.35.1
+      - name: Download mpv source and extract headers
         run: |
-          curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.35.1.tar.gz
+          curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.34.0.tar.gz
           tar -xzf mpv.tar.gz
-          cd mpv-0.35.1
+          mkdir -p mpv-headers
+          cp -r mpv-0.34.0/libmpv mpv-headers/
+
+      - name: Build libmpv (shared)
+        run: |
+          cd mpv-0.34.0
           ./bootstrap.py
           ./waf configure --disable-cplayer --enable-libmpv-shared --prefix=$PWD/../mpv-local
           ./waf build
@@ -31,18 +36,18 @@ jobs:
           echo "PKG_CONFIG_PATH=$PWD/mpv-local/lib/pkgconfig" >> $GITHUB_ENV
           echo "DYLD_LIBRARY_PATH=$PWD/mpv-local/lib" >> $GITHUB_ENV
 
-      - name: Build plugin
+      - name: Build WLX plugin bundle
         run: |
           mkdir -p release/MpvVideo
           gcc -Wall -fPIC -ObjC -framework Cocoa \
+            -I./mpv-headers \
             -bundle -undefined dynamic_lookup \
-            -I./mpv-local/include \
             -o release/MpvVideo/MpvVideo.wlx \
-            mpvvideo.c \
-            $(pkg-config --cflags --libs $PWD/mpv-local/lib/pkgconfig/mpv.pc)
+            mpvvideo.c $(pkg-config --cflags --libs mpv)
+
           cp mpv-local/lib/libmpv.dylib release/MpvVideo/
-          install_name_tool -change libmpv.2.dylib \
-              @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx
+          install_name_tool -change libmpv.1.dylib \
+              @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx || true
 
       - name: Package plugin
         run: |
