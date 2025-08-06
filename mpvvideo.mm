@@ -151,9 +151,9 @@ void DCPCALL ListCloseWindow(HWND listWin) {
         mpv_terminate_destroy(mpv);
         mpv = NULL;
     }
-    if (glView)    { [glView removeFromSuperview];    glView    = nil; }
-    if (seekSlider){ [seekSlider removeFromSuperview];seekSlider= nil; }
-    if (playPauseBtn){ [playPauseBtn removeFromSuperview]; playPauseBtn = nil; }
+    if (glView)       { [glView removeFromSuperview];       glView       = nil; }
+    if (seekSlider)   { [seekSlider removeFromSuperview];   seekSlider   = nil; }
+    if (playPauseBtn) { [playPauseBtn removeFromSuperview]; playPauseBtn = nil; }
     controller = nil;
 }
 
