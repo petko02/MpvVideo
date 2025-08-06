@@ -1,4 +1,3 @@
-# .github/workflows/build-wlx.yml
 name: Build WLX Plugin (MpvVideo)
 
 on:
@@ -9,7 +8,6 @@ on:
 jobs:
   build:
     runs-on: macos-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -17,26 +15,31 @@ jobs:
       - name: Install dependencies
         run: |
           brew update
-          brew install mpv pkg-config coreutils
+          brew install mpv coreutils
+
+      - name: Organize mpv headers
+        run: |
+          # Copy the two headers you placed in the repo root into mpv/
+          mkdir -p mpv
+          cp client.h    mpv/client.h
+          cp opengl_cb.h mpv/opengl_cb.h
 
       - name: Prepare plugin directory
         run: mkdir -p MpvVideo.wlx
 
       - name: Compile Objective-C++
         run: |
-          # Let pkg-config tell us where mpv.pc lives and what flags to use
-          export PKG_CONFIG_PATH="$(brew --prefix mpv)/lib/pkgconfig:${PKG_CONFIG_PATH}"
-          CFLAGS="$(pkg-config --cflags mpv)"
-          LDFLAGS="$(pkg-config --libs mpv)"
+          PREFIX=$(brew --prefix mpv)
           clang++ -ObjC++ -Wall -O2 -fPIC \
-            $CFLAGS \
             -I. \
+            -I"${PREFIX}/include" \
+            -L"${PREFIX}/lib" \
             -framework Cocoa \
             -framework QuartzCore \
             -framework OpenGL \
             mpvvideo.mm \
             -dynamiclib -o MpvVideo.wlx/libmpvvideo.dylib \
-            $LDFLAGS
+            -lmpv
 
       - name: Package for release
         run: |
