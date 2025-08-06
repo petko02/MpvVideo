@@ -1,62 +1,58 @@
-name: Build WLX Plugin
+name: Build MpvVideo WLX Plugin
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
+    branches: [main]
 
 jobs:
   build:
     runs-on: macos-14
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
-          brew update
-          brew install fpc meson ninja pkg-config jpeg uchardet wget
+          brew install pkg-config jpeg libass lua uchardet ffmpeg
 
-      - name: Download and extract mpv headers
+      - name: Clone full mpv repo with headers
         run: |
-          curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.34.0.tar.gz
-          tar -xzf mpv.tar.gz
+          git clone --depth=1 --branch v0.34.0 https://github.com/mpv-player/mpv.git mpv-full
           mkdir -p mpv-headers
-          cp -r mpv-0.34.0/libmpv mpv-headers/
-          cp -r mpv-0.34.0/include/mpv mpv-headers/
+          cp -r mpv-full/include/mpv mpv-headers/
+          cp -r mpv-full/libmpv/*.h mpv-headers/
 
-      - name: Set environment variables
+      - name: Build libmpv.dylib (minimal build)
         run: |
-          echo "C_INCLUDE_PATH=$PWD/mpv-headers:$C_INCLUDE_PATH" >> $GITHUB_ENV
-          echo "LIBRARY_PATH=$PWD/mpv-headers:$LIBRARY_PATH" >> $GITHUB_ENV
+          cd mpv-full
+          ./bootstrap.py
+          ./waf configure --disable-cplayer --enable-libmpv-shared --prefix=$PWD/../mpv-local
+          ./waf build
+          ./waf install
+          cd ..
+          echo "PKG_CONFIG_PATH=$PWD/mpv-local/lib/pkgconfig" >> $GITHUB_ENV
+          echo "DYLD_LIBRARY_PATH=$PWD/mpv-local/lib" >> $GITHUB_ENV
 
       - name: Patch BOOL typedef and detect function
         run: |
-          # Insert BOOL typedef at the top if not already patched
-          if ! grep -q 'ifndef __OBJC__' mpvvideo.c; then
-            printf "#ifndef __OBJC__\ntypedef int BOOL;\n#endif\n" | cat - mpvvideo.c > temp && mv temp mpvvideo.c
-          fi
-
-          # Fix ListGetDetectString signature to match plugin header
+          sed -i '' '1s;^;#ifndef __OBJC__\n#define __OBJC__\n#include <stdbool.h>\ntypedef int BOOL;\n#endif\n;' mpvvideo.c
           sed -i '' 's/int DCPCALL ListGetDetectString/void DCPCALL ListGetDetectString/' mpvvideo.c
 
       - name: Compile mpvvideo.c
         run: |
           mkdir -p release/MpvVideo
-          fpc -Mdelphi -Scgi -CX -XX -O2 -k"-framework" -kCocoa -k"-framework" -kOpenGL -k"-framework" -kQuartzCore \
-              -k"-framework" -kIOKit -k"-framework" -kCoreVideo -k"-framework" -kCoreFoundation \
-              -Fu. -FErelease/MpvVideo -oMpvVideo.wlx mpvvideo.c
+          clang -shared -fPIC -I./mpv-headers \
+            -framework Cocoa -framework OpenGL \
+            -o release/MpvVideo/mpvvideo.wlx mpvvideo.c \
+            mpv-local/lib/libmpv.dylib
 
-      - name: Package release
+      - name: Copy libmpv.dylib to release folder
         run: |
-          cd release
-          zip -r MpvVideo-macOS.zip MpvVideo
-          cd ..
+          cp mpv-local/lib/libmpv.dylib release/MpvVideo/
 
-      - name: Upload plugin ZIP
+      - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
           name: MpvVideo-macOS
-          path: release/MpvVideo-macOS.zip
+          path: release/MpvVideo/
