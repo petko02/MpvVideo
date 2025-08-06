@@ -1,4 +1,4 @@
-name: Build MpvVideo WLX Plugin
+name: Build WLX MpvVideo Plugin
 
 on:
   push:
@@ -15,50 +15,45 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install fpc pkg-config meson ninja jpeg uchardet
+          brew install fpc fpcsrc fp-units-cocoa jpeg sdl2 uchardet pkg-config meson ninja
 
       - name: Download and build mpv (libmpv)
         run: |
           curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.34.0.tar.gz
           tar -xzf mpv.tar.gz
           cd mpv-0.34.0
-
           curl -O https://waf.io/waf-2.0.20
           chmod +x waf
-
-          # Patch distutils issue in Python 3.12+
-          pipx install setuptools
-
           ./waf configure --disable-cplayer --enable-libmpv-shared --prefix=$PWD/../mpv-local
           ./waf build
           ./waf install
           cd ..
-
           echo "PKG_CONFIG_PATH=$PWD/mpv-local/lib/pkgconfig" >> $GITHUB_ENV
           echo "DYLD_LIBRARY_PATH=$PWD/mpv-local/lib" >> $GITHUB_ENV
 
       - name: Patch BOOL typedef and detect function
         run: |
-          # Add BOOL workaround if not using Objective-C
-          sed -i '' '1s;^;#ifndef __OBJC__\n#include <stdbool.h>\ntypedef int BOOL;\n#endif\n;' mpvvideo.c
-
-          # Fix incorrect return type
+          sed -i '' '1i\
+#ifndef __OBJC__\
+typedef int BOOL;\
+#endif' mpvvideo.c
           sed -i '' 's/int DCPCALL ListGetDetectString/void DCPCALL ListGetDetectString/' mpvvideo.c
 
-      - name: Compile plugin
+      - name: Compile WLX plugin
         run: |
-          fpc -B -Twin64 -Mdelphi -k"-framework Cocoa" mpvvideo.dpr
+          fpc -k"-rpath @loader_path" -Flmpv-local/lib -k"-Fmpv-local/lib" \
+              -k"-framework Cocoa" -k"-framework OpenGL" -Xr -oMpvVideo.wlx mpvvideo.c
 
-      - name: Create release folder and copy plugin
+      - name: Create release folder and copy artifacts
         run: |
           mkdir -p release/MpvVideo
-          cp mpvvideo.wlx release/MpvVideo/
-          cp mpv-local/lib/libmpv.dylib release/MpvVideo/
-          cp README.md release/MpvVideo/
-          cp LICENSE release/MpvVideo/
+          cp MpvVideo.wlx release/MpvVideo/
+          cp -R mpv-local/lib/libmpv.* release/MpvVideo/
+          cp README.md release/MpvVideo/ || true
+          cp LICENSE release/MpvVideo/ || true
 
       - name: Upload release ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: MpvVideo_WLX
+          name: MpvVideo-wlx-macos
           path: release/MpvVideo
