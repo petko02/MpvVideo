@@ -11,7 +11,6 @@ HWND DCPCALL ListLoad(HWND ParentWin, char *FileToLoad, int ShowFlags)
     mpv = mpv_create();
     if (!mpv) return 0;
 
-    // Embed video into provided window
     char wid[64];
     snprintf(wid, sizeof(wid), "%p", (void *)ParentWin);
     mpv_set_option_string(mpv, "wid", wid);
