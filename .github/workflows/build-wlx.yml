@@ -46,8 +46,8 @@ jobs:
       - name: Build and install Free Pascal 3.3.1
         run: |
           cd fpc-source
-          make FPC=$(which fpc) all
-          sudo make install
+          make FPC=$(which fpc) -XR=${SDKROOT} all
+          sudo make -XR=${SDKROOT} install
           fpc -iW  # Show installed version
 
       - name: Build WLX plugin
