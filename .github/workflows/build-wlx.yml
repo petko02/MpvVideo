@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Free Pascal
         run: sudo apt-get update && sudo apt-get install -y fp-compiler
@@ -23,7 +23,7 @@ jobs:
           ls -lh release
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: MpvVideo-wlx
           path: release/MpvVideo.wlx
