@@ -20,23 +20,24 @@ jobs:
             cp wlxplugin.pas sdk/wlxplugin.pas
           fi
 
-      - name: Install dependencies
+      - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y curl build-essential git binutils-mingw-w64-x86-64 \
               libgtk2.0-dev libpango1.0-dev libglib2.0-dev libx11-dev
 
-      - name: Download fpcupdeluxe
+      - name: Download fpcupdeluxemini
         run: |
-          curl -L -o fpcupdeluxe https://github.com/LongDirtyAnimAlf/fpcupdeluxe/releases/latest/download/fpcupdeluxe-x86_64-linux
-          chmod +x fpcupdeluxe
+          curl -L -o fpcupdeluxemini \
+            https://github.com/LongDirtyAnimAlf/fpcupdeluxe/releases/latest/download/fpcupdeluxemini-x86_64-linux
+          chmod +x fpcupdeluxemini
 
       - name: Build Darwin cross-compiler (Intel)
         run: |
-          ./fpcupdeluxe --fpcURL=https://gitlab.com/freepascal.org/fpc/source.git \
-                        --lazURL=https://gitlab.com/freepascal.org/lazarus/lazarus.git \
-                        --crossall darwin \
-                        --installdir=$HOME/fpcup
+          ./fpcupdeluxemini --fpcURL=https://gitlab.com/freepascal.org/fpc/source.git \
+                            --lazURL=https://gitlab.com/freepascal.org/lazarus/lazarus.git \
+                            --crossall darwin \
+                            --installdir=$HOME/fpcup
           echo "$HOME/fpcup/cross/bin/x86_64-darwin" >> $GITHUB_PATH
           echo "$HOME/fpcup/bin/x86_64-linux" >> $GITHUB_PATH
 
