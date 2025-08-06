@@ -14,11 +14,10 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Install mpv & tools
+      - name: Install dependencies
         run: |
           brew update
-          brew install mpv
-          brew install coreutils
+          brew install mpv pkg-config coreutils
 
       - name: Prepare plugin dir
         run: mkdir -p MpvVideo.wlx
@@ -26,15 +25,13 @@ jobs:
       - name: Compile Objective-C++
         run: |
           clang++ -ObjC++ -Wall -O2 -fPIC \
-            -I. \
-            -I/usr/local/include \
-            -L/usr/local/lib \
+            -I. `pkg-config --cflags libmpv` \
+            -dynamiclib mpvvideo.mm \
+            -o MpvVideo.wlx/libmpvvideo.dylib \
+            `pkg-config --libs libmpv` \
             -framework Cocoa \
             -framework QuartzCore \
-            -framework OpenGL \
-            -lmpv \
-            -dynamiclib mpvvideo.mm \
-            -o MpvVideo.wlx/libmpvvideo.dylib
+            -framework OpenGL
 
       - name: Package for release
         run: |
