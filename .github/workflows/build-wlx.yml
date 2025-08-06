@@ -1,4 +1,4 @@
-name: Build WLX Plugin (ARM64 Portable)
+name: Build WLX Plugin (macOS Bundle, Portable)
 
 on:
   workflow_dispatch:
@@ -18,28 +18,28 @@ jobs:
           brew update
           brew install mpv pkg-config
 
-      - name: Build WLX plugin
+      - name: Build WLX plugin bundle
         run: |
           mkdir -p release/MpvVideo
-          gcc -Wall -fPIC -dynamiclib \
-            -arch arm64 \
+          gcc -Wall -fPIC -bundle -undefined dynamic_lookup \
             -o release/MpvVideo/MpvVideo.wlx \
             mpvvideo.c $(pkg-config --cflags --libs mpv)
 
-      - name: Copy libmpv and patch binary
-        run: |
+          # Copy libmpv.dylib
           cp $(brew --prefix)/lib/libmpv.dylib release/MpvVideo/
+
+          # Patch binary to load from plugin folder
           install_name_tool -change libmpv.dylib \
               @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx || true
 
       - name: Package plugin
         run: |
           cd release
-          zip -r MpvVideo-macos-portable.zip MpvVideo
+          zip -r MpvVideo-macos-bundle.zip MpvVideo
           cd ..
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MpvVideo-wlx-macos-portable
-          path: release/MpvVideo-macos-portable.zip
+          name: MpvVideo-wlx-macos-bundle
+          path: release/MpvVideo-macos-bundle.zip
