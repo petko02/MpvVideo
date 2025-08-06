@@ -1,52 +1,55 @@
-name: Build MpvVideo.wlx
+name: Build WLX Plugin
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: macos-14
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          brew install mpv meson ninja pkg-config jpeg automake autoconf libtool python@3.12
+    - name: Install dependencies
+      run: |
+        brew install --quiet --overwrite fpc pkg-config jpeg uchardet
 
-      - name: Download mpv source
-        run: |
-          git clone --depth=1 https://github.com/mpv-player/mpv.git mpv-full
-          mkdir -p mpv-headers
-          cp -r mpv-full/libmpv mpv-headers/
-          cp -r mpv-full/include/mpv mpv-headers/
+    - name: Download mpv source (full) for headers
+      run: |
+        git clone --depth=1 --branch v0.34.0 https://github.com/mpv-player/mpv.git mpv-full
+        mkdir -p mpv-headers
+        cp -r mpv-full/libmpv mpv-headers/
+        cp -r mpv-full/include/mpv mpv-headers/
 
-      - name: Export mpv header path
-        run: echo "CFLAGS=-I$PWD/mpv-headers/include" >> $GITHUB_ENV
+    - name: Set environment paths for mpv
+      run: |
+        echo "CPATH=$PWD/mpv-headers:$PWD/mpv-headers/mpv:$CPATH" >> $GITHUB_ENV
+        echo "DYLD_LIBRARY_PATH=$PWD/mpv-local/lib" >> $GITHUB_ENV
 
-      - name: Patch BOOL typedef and ListGetDetectString
-        run: |
-          sed -i '' '1i\
+    - name: Patch BOOL typedef and ListGetDetectString
+      run: |
+        sed -i '' '1i\
 #ifndef __OBJC__\
 typedef int BOOL;\
 #endif' mpvvideo.c
-          sed -i '' 's/int DCPCALL ListGetDetectString/void DCPCALL ListGetDetectString/' mpvvideo.c
+        sed -i '' 's/int DCPCALL ListGetDetectString/void DCPCALL ListGetDetectString/' mpvvideo.c
 
-      - name: Compile mpvvideo.c
-        run: |
-          mkdir -p release/MpvVideo
-          clang -mmacosx-version-min=10.15 -Wall -framework Cocoa -I./mpv-headers/include -fPIC -shared -o release/MpvVideo/mpvvideo.wlx64 mpvvideo.c -lmpv
+    - name: Compile mpvvideo.c
+      run: |
+        mkdir -p release/MpvVideo
+        fpc -Mdelphi -Fu./mpv-headers -k"-framework Cocoa" -k"-L$DYLD_LIBRARY_PATH" mpvvideo.c -o./release/MpvVideo/mpvvideo.wlx
 
-      - name: Copy files to release
-        run: |
-          cp mpvvideo.txt release/MpvVideo/
-          cp mpvvideo.inf release/MpvVideo/
-          cp LICENSE release/MpvVideo/
+    - name: Copy plugin files
+      run: |
+        mkdir -p release/MpvVideo
+        cp doublecmd-wlx-description.txt release/MpvVideo/
+        cp mpv-local/lib/libmpv.dylib release/MpvVideo/
 
-      - name: Upload release ZIP
-        uses: actions/upload-artifact@v4
-        with:
-          name: MpvVideo-wlx
-          path: release/MpvVideo
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: MpvVideo-wlx
+        path: release/MpvVideo
