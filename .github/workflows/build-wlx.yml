@@ -1,4 +1,4 @@
-name: Build WLX Plugin (Universal macOS, Portable)
+name: Build WLX Plugin (ARM64 Portable)
 
 on:
   workflow_dispatch:
@@ -18,44 +18,28 @@ jobs:
           brew update
           brew install mpv pkg-config
 
-      - name: Build WLX plugin (ARM64)
+      - name: Build WLX plugin
         run: |
           mkdir -p release/MpvVideo
           gcc -Wall -fPIC -dynamiclib \
             -arch arm64 \
-            -o release/MpvVideo/MpvVideo_arm64.wlx \
+            -o release/MpvVideo/MpvVideo.wlx \
             mpvvideo.c $(pkg-config --cflags --libs mpv)
-
-      - name: Build WLX plugin (x86_64)
-        run: |
-          gcc -Wall -fPIC -dynamiclib \
-            -arch x86_64 \
-            -o release/MpvVideo/MpvVideo_x86_64.wlx \
-            mpvvideo.c $(pkg-config --cflags --libs mpv)
-
-      - name: Merge into Universal Binary
-        run: |
-          lipo -create \
-            release/MpvVideo/MpvVideo_arm64.wlx \
-            release/MpvVideo/MpvVideo_x86_64.wlx \
-            -output release/MpvVideo/MpvVideo.wlx
-          rm release/MpvVideo/MpvVideo_arm64.wlx release/MpvVideo/MpvVideo_x86_64.wlx
 
       - name: Copy libmpv and patch binary
         run: |
           cp $(brew --prefix)/lib/libmpv.dylib release/MpvVideo/
-          # Use only relative loader path
           install_name_tool -change libmpv.dylib \
               @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx || true
 
       - name: Package plugin
         run: |
           cd release
-          zip -r MpvVideo-macos-universal-portable.zip MpvVideo
+          zip -r MpvVideo-macos-portable.zip MpvVideo
           cd ..
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MpvVideo-wlx-macos-universal-portable
-          path: release/MpvVideo-macos-universal-portable.zip
+          name: MpvVideo-wlx-macos-portable
+          path: release/MpvVideo-macos-portable.zip
