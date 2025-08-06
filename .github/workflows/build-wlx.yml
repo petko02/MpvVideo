@@ -7,53 +7,38 @@ on:
 
 jobs:
   build:
-    runs-on: macos-13
+    runs-on: macos-latest   # Intel macOS; self-hosted ARM if you need M1
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Install dependencies
+      - name: Install mpv & tools
         run: |
-          brew install fpc clang coreutils curl unzip
+          brew update
+          brew install mpv       # provides libmpv & headers
+          brew install coreutils # gnu tools if you need them
 
-      - name: Download mpv headers
+      - name: Prepare plugin dir
+        run: mkdir -p MpvVideo.wlx
+
+      - name: Compile Objective-C++
         run: |
-          curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.34.0.tar.gz
-          tar -xzf mpv.tar.gz
-          mkdir -p mpv-headers
-          cp -r mpv-0.34.0/libmpv mpv-headers/mpv
-          cp -r mpv-0.34.0/include/mpv/*.h mpv-headers/mpv/
+          clang++ -ObjC++ -Wall -O2 -fPIC \
+            -I. \                       # so it finds common.h, wlxplugin.h
+            -framework Cocoa \
+            -framework QuartzCore \
+            -lmpv \
+            -dynamiclib mpvvideo.mm \
+            -o MpvVideo.wlx/libmpvvideo.dylib
 
-      - name: Patch BOOL typedef and ListGetDetectString
-        run: |
-          # Patch BOOL definition to avoid conflict with Cocoa headers
-          sed -i '' '1i\
-#ifndef __OBJC__\
-typedef int BOOL;\
-#endif' mpvvideo.c
-
-          # Patch function signature to match plugin header
-          sed -i '' 's/int DCPCALL ListGetDetectString/void DCPCALL ListGetDetectString/' mpvvideo.c
-
-      - name: Compile mpvvideo.c
-        run: |
-          clang -Wall -O2 -fPIC \
-            -I./mpv-headers \
-            -framework Cocoa -framework OpenGL \
-            -shared mpvvideo.c -o MpvVideo.wlx/libmpvvideo.dylib
-
-      - name: Prepare plugin folder
+      - name: Package for release
         run: |
           mkdir -p release/MpvVideo
           cp MpvVideo.wlx/libmpvvideo.dylib release/MpvVideo/
-          cp mpvvideo.{c,pas} release/MpvVideo/
-          cp README.md release/MpvVideo/ || true
-
-      - name: Zip plugin for release
-        run: |
-          cd release
-          zip -r MpvVideo.zip MpvVideo
+          cp *.h mpvvideo.mm release/MpvVideo/ || true
+          cp README.md release/MpvVideo/      || true
+          cd release && zip -r MpvVideo.zip MpvVideo
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
