@@ -18,12 +18,11 @@ jobs:
           brew update
           brew install mpv pkg-config
 
-      - name: 📦 Download and extract mpv headers
+      - name: 📦 Clone mpv source for all headers (including opengl_cb.h)
         run: |
-          curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.40.0.tar.gz
-          tar -xzf mpv.tar.gz
+          git clone --depth=1 https://github.com/mpv-player/mpv.git mpv-source
           mkdir -p mpv-headers/mpv
-          cp -r mpv-0.40.0/include/mpv/* mpv-headers/mpv/
+          cp -r mpv-source/include/mpv/* mpv-headers/mpv/
 
       - name: 🧱 Build WLX plugin bundle
         run: |
@@ -34,8 +33,8 @@ jobs:
             -o release/MpvVideo/MpvVideo.wlx \
             mpvvideo.c $(pkg-config --cflags --libs mpv)
 
-          # Embed libmpv.dylib for portable use
-          cp $(brew --prefix)/lib/libmpv.dylib release/MpvVideo/
+          # Embed libmpv.dylib for standalone use
+          cp "$(brew --prefix)/lib/libmpv.dylib" release/MpvVideo/
           install_name_tool -change libmpv.dylib \
               @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx || true
 
