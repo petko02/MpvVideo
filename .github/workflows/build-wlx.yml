@@ -1,31 +1,29 @@
-name: Build WLX MpvVideo Plugin
+name: Build WLX Plugin
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-13
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Install dependencies
         run: |
-          brew install --overwrite python@3.11 pkg-config meson ninja ffmpeg
-          brew link --overwrite python@3.11
+          brew install fpc pkg-config meson ninja
 
-      - name: Download mpv source (v0.34.0) and extract headers
+      - name: Download and extract mpv 0.34.0
         run: |
           curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.34.0.tar.gz
           tar -xzf mpv.tar.gz
-          mkdir -p mpv-headers/mpv
-          cp -v mpv-0.34.0/libmpv/client.h mpv-headers/mpv/
-          cp -v mpv-0.34.0/video/out/opengl_cb.h mpv-headers/mpv/
+          mkdir -p mpv-headers
+          cp -R mpv-0.34.0/libmpv/{client.h,render.h} mpv-headers/ || true
+          cp -R mpv-0.34.0/video/out/opengl_cb.h mpv-headers/ || true
 
       - name: Patch BOOL typedef and ListGetDetectString
         run: |
@@ -39,20 +37,20 @@ typedef int BOOL;\
         run: |
           clang -Wall -O2 -fPIC \
             -I./mpv-headers \
-            -I./ \
             -framework Cocoa \
-            -lmpv \
+            -framework OpenGL \
             -shared -o MpvVideo.wlx mpvvideo.c
 
-      - name: Prepare ZIP structure
+      - name: Create release folder and zip
         run: |
           mkdir -p release/MpvVideo
           cp MpvVideo.wlx release/MpvVideo/
-          cp mpvvideo.ini release/MpvVideo/
-          zip -r MpvVideo.zip release
+          cp mpvvideo.c release/MpvVideo/
+          cp *.h release/MpvVideo/ || true
+          cd release && zip -r MpvVideo.zip MpvVideo
 
-      - name: Upload ZIP
+      - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: MpvVideo.zip
-          path: MpvVideo.zip
+          name: MpvVideo
+          path: release/MpvVideo.zip
