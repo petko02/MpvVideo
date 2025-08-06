@@ -13,13 +13,31 @@ jobs:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 📦 Download mpv v0.34 source
+      - name: 🗂️ Cache mpv build
+        id: cache-mpv
+        uses: actions/cache@v4
+        with:
+          path: |
+            mpv-install
+            mpv-headers
+            libmpv.dylib
+          key: mpv-macos-0.34-${{ runner.os }}
+
+      - name: 📦 Download mpv v0.34 source (if cache miss)
+        if: steps.cache-mpv.outputs.cache-hit != 'true'
         run: |
           curl -L -o mpv-0.34.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.34.0.tar.gz
           tar -xzf mpv-0.34.tar.gz
           mv mpv-0.34.0 mpv-source
 
-      - name: 🔨 Build libmpv from source
+      - name: 🛠️ Install Python distutils (fix Waf build)
+        if: steps.cache-mpv.outputs.cache-hit != 'true'
+        run: |
+          python3 -m ensurepip --upgrade
+          pip3 install setuptools
+
+      - name: 🔨 Build libmpv from source (if cache miss)
+        if: steps.cache-mpv.outputs.cache-hit != 'true'
         run: |
           brew install meson ninja pkg-config \
               libass luajit little-cms2 jpeg libplacebo uchardet
