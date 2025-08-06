@@ -1,4 +1,3 @@
-# .github/workflows/build-wlx.yml
 name: Build WLX Plugin (MpvVideo)
 
 on:
@@ -11,7 +10,7 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Install dependencies
@@ -19,28 +18,26 @@ jobs:
           brew update
           brew install mpv pkg-config coreutils
 
-      - name: Prepare plugin dir
+      - name: Prepare plugin directory
         run: mkdir -p MpvVideo.wlx
 
       - name: Compile Objective-C++
         run: |
-          # Ensure pkg-config can find libmpv’s .pc file
-          PREFIX=$(brew --prefix mpv)
-          export PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}"
-          # Get the right include & lib flags
+          # Ensure pkg-config can find libmpv.pc
+          export PKG_CONFIG_PATH="$(brew --prefix mpv)/lib/pkgconfig:${PKG_CONFIG_PATH}"
+          # Grab the right include flags (points at client.h & opengl_cb.h)
           CFLAGS="$(pkg-config --cflags libmpv)"
-          LDFLAGS="$(pkg-config --libs   libmpv)"
-          # Compile with ObjC++ + Cocoa + QuartzCore + OpenGL
+          # Grab the right linker flags
+          LDFLAGS="$(pkg-config --libs libmpv)"
           clang++ -ObjC++ -Wall -O2 -fPIC \
-            $CFLAGS \
+            ${CFLAGS} \
             -I. \
             -framework Cocoa \
             -framework QuartzCore \
             -framework OpenGL \
             mpvvideo.mm \
-            -dynamiclib \
-            -o MpvVideo.wlx/libmpvvideo.dylib \
-            $LDFLAGS
+            -dynamiclib -o MpvVideo.wlx/libmpvvideo.dylib \
+            ${LDFLAGS}
 
       - name: Package for release
         run: |
