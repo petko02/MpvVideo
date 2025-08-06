@@ -1,4 +1,4 @@
-name: Build WLX Plugin
+name: Build WLX Plugin (macOS)
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -19,19 +19,18 @@ jobs:
           if [ -f "wlxplugin.pas" ] && [ ! -f "sdk/wlxplugin.pas" ]; then
             cp wlxplugin.pas sdk/wlxplugin.pas
           fi
-          echo "SDK folder prepared with wlxplugin.pas"
 
       - name: Install Free Pascal
-        run: sudo apt-get update && sudo apt-get install -y fp-compiler
+        run: brew install fpc
 
       - name: Build WLX plugin
         run: |
           mkdir -p release
-          fpc -Fu./ -Fu./sdk -k"-shared" -o"release/MpvVideo.wlx" MpvVideo.lpr
+          fpc -Fu./ -Fu./sdk -k"-bundle" -o"release/MpvVideo.wlx" MpvVideo.lpr
           ls -lh release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MpvVideo-wlx
+          name: MpvVideo-wlx-macos
           path: release/MpvVideo.wlx
