@@ -13,20 +13,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install runtime libmpv
         run: |
           brew update
           brew install mpv pkg-config
+
+      - name: Download mpv headers
+        run: |
+          curl -L https://github.com/mpv-player/mpv/archive/refs/tags/v0.40.0.tar.gz -o mpv.tar.gz
+          tar -xzf mpv.tar.gz
+          mkdir -p mpv-headers
+          cp -r mpv-0.40.0/libmpv mpv-headers/mpv
 
       - name: Build WLX plugin bundle
         run: |
           mkdir -p release/MpvVideo
           gcc -Wall -fPIC -ObjC -framework Cocoa \
+            -I./mpv-headers \
             -bundle -undefined dynamic_lookup \
             -o release/MpvVideo/MpvVideo.wlx \
             mpvvideo.c $(pkg-config --cflags --libs mpv)
 
-          # Copy libmpv for portability
           cp $(brew --prefix)/lib/libmpv.dylib release/MpvVideo/
           install_name_tool -change libmpv.dylib \
               @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx || true
