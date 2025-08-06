@@ -1,4 +1,4 @@
-name: Build WLX Plugin (macOS ARM, FPC 3.3.1 via GitLab)
+name: Build WLX Plugin (macOS ARM, FPC 3.3.1)
 
 on:
   workflow_dispatch:
@@ -20,10 +20,16 @@ jobs:
             cp wlxplugin.pas sdk/wlxplugin.pas
           fi
 
+      - name: Install Developer Tools
+        run: |
+          sudo xcode-select --install || true
+          export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
+          echo "SDKROOT=$SDKROOT" >> $GITHUB_ENV
+
       - name: Install build dependencies
         run: brew install fpc make git
 
-      - name: Configure Git to avoid HTTP/2 issue
+      - name: Configure Git for HTTP/1.1
         run: git config --global http.version HTTP/1.1
 
       - name: Download Free Pascal 3.3.1 (GitLab)
@@ -40,7 +46,7 @@ jobs:
       - name: Build and install Free Pascal 3.3.1
         run: |
           cd fpc-source
-          make all
+          make FPC=$(which fpc) all
           sudo make install
           fpc -iW  # Show installed version
 
