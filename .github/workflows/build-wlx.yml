@@ -19,28 +19,17 @@ jobs:
           brew update
           brew install mpv coreutils
 
-      - name: Vendor mpv C-API headers
-        run: |
-          # Download mpv v0.40.0 source
-          curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.40.0.tar.gz
-          tar -xzf mpv.tar.gz
-          mkdir -p mpv-headers/mpv
-          # Copy all C-API headers (client.h, etc.)
-          cp mpv-0.40.0/include/mpv/*.h mpv-headers/mpv/
-          # Pull opengl_cb.h from a lightweight mirror
-          curl -L \
-            https://raw.githubusercontent.com/Ivshti/libmpv/master/include/mpv/opengl_cb.h \
-            -o mpv-headers/mpv/opengl_cb.h
-
       - name: Prepare plugin directory
         run: mkdir -p MpvVideo.wlx
 
       - name: Compile Objective-C++
         run: |
+          # Point at the mpv formula’s include/lib dirs so clang finds opengl_cb.h
+          PREFIX=$(brew --prefix mpv)
           clang++ -ObjC++ -Wall -O2 -fPIC \
             -I. \
-            -Impv-headers \
-            -L"$(brew --prefix mpv)/lib" \
+            -I"${PREFIX}/include" \
+            -L"${PREFIX}/lib" \
             -framework Cocoa \
             -framework QuartzCore \
             -framework OpenGL \
