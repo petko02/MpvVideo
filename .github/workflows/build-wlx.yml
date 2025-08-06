@@ -23,17 +23,20 @@ jobs:
           curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.40.0.tar.gz
           tar -xzf mpv.tar.gz
           mkdir -p mpv-headers
-          # Copy all headers preserving folder structure
+          # Copy all headers preserving structure
           find mpv-0.40.0 -type f -name "*.h" -exec cp --parents {} mpv-headers/ \;
-
-          echo "Headers copied to mpv-headers:"
-          find mpv-headers -type f | head -n 20
+          echo "✅ Headers copied:"
+          find mpv-headers -type f | head -n 30
 
       - name: Build WLX plugin bundle
         run: |
           mkdir -p release/MpvVideo
+          # Dynamically locate include path for mpv headers
+          INCLUDE_PATH=$(find mpv-headers -type f -name "opengl_cb.h" | head -n 1 | xargs dirname | xargs dirname)
+          echo "✅ Using include path: $INCLUDE_PATH"
+          
           gcc -Wall -fPIC -ObjC -framework Cocoa \
-            -I./mpv-headers/mpv-0.40.0 \
+            -I"$INCLUDE_PATH" \
             -bundle -undefined dynamic_lookup \
             -o release/MpvVideo/MpvVideo.wlx \
             mpvvideo.c $(pkg-config --cflags --libs mpv)
