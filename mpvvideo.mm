@@ -3,21 +3,18 @@
 #import <QuartzCore/QuartzCore.h>
 #import <stdint.h>
 
-// Stub out FILETIME on macOS so common.h (which references it) will compile:
+// Stub FILETIME so common.h compiles
 #ifndef _FILETIME_DEFINED
 #define _FILETIME_DEFINED
-typedef struct {
-    uint32_t dwLowDateTime;
-    uint32_t dwHighDateTime;
-} FILETIME;
+typedef struct { uint32_t dwLowDateTime, dwHighDateTime; } FILETIME;
 #endif
 
 #import "common.h"
 #import "wlxplugin.h"
 #import <mpv/client.h>
-#import <mpv/opengl_cb.h>
+// ← **Import the sub-API header from the top-level include path**  
+#import <opengl_cb.h>
 
-// Fallback if not defined in your SDK:
 #ifndef EXTENSIONS_MEDIA
 #define EXTENSIONS_MEDIA "*.mp4;*.mkv;*.avi;*.mov;*.webm"
 #endif
@@ -27,25 +24,26 @@ typedef struct {
 @interface MpvGLView : NSOpenGLView
 @property (nonatomic, assign) mpv_opengl_cb_context *mpv_gl;
 @end
-
 @implementation MpvGLView
 - (void)drawRect:(NSRect)dirtyRect {
     if (_mpv_gl) {
-        mpv_opengl_cb_draw(_mpv_gl);
+        // mpv_opengl_cb_draw now takes 4 args: ctx, fbo, width, height
+        NSRect r = self.bounds;
+        mpv_opengl_cb_draw(_mpv_gl, 0, r.size.width, r.size.height);
     }
 }
 - (void)dealloc {
     if (_mpv_gl) {
+        // new signature takes ctx, glProc, fbo, etc.; pass NULLs/defaults
         mpv_opengl_cb_uninit_gl(_mpv_gl);
         _mpv_gl = NULL;
     }
 }
 @end
 
-#pragma mark –– Controller to bridge Cocoa → C callbacks
+#pragma mark –– Controller bridge
 
-@interface MpvController : NSObject
-@end
+@interface MpvController : NSObject @end
 @implementation MpvController
 - (void)sliderChanged:(NSSlider*)s  { extern void seekSliderMoved(NSSlider*); seekSliderMoved(s); }
 - (void)buttonClicked:(NSButton*)b  { extern void playPausePressed(NSButton*); playPausePressed(b); }
@@ -61,112 +59,92 @@ static NSSlider              *seekSlider   = nil;
 static NSButton              *playPauseBtn = nil;
 static MpvController         *controller   = nil;
 
-#pragma mark –– C callback implementations
+#pragma mark –– C callbacks
 
 void updateSeekPosition() {
     if (!mpv || !seekSlider) return;
-    double pos = 0, dur = 0;
-    mpv_get_property(mpv, "time-pos", MPV_FORMAT_DOUBLE, &pos);
-    mpv_get_property(mpv, "duration", MPV_FORMAT_DOUBLE, &dur);
-    if (dur > 0) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [seekSlider setDoubleValue:(pos/dur)*100.0];
-        });
-    }
+    double pos=0, dur=0;
+    mpv_get_property(mpv, "time-pos",  MPV_FORMAT_DOUBLE, &pos);
+    mpv_get_property(mpv, "duration",  MPV_FORMAT_DOUBLE, &dur);
+    if (dur>0) dispatch_async(dispatch_get_main_queue(), ^{
+        [seekSlider setDoubleValue:(pos/dur)*100.0];
+    });
 }
 
 void seekSliderMoved(NSSlider *slider) {
     if (!mpv) return;
-    double pct = slider.doubleValue, dur = 0;
+    double pct=slider.doubleValue, dur=0;
     mpv_get_property(mpv, "duration", MPV_FORMAT_DOUBLE, &dur);
-    if (dur > 0) {
-        double t = (pct/100.0)*dur;
+    if (dur>0) {
+        double t=(pct/100.0)*dur;
         mpv_set_property(mpv, "time-pos", MPV_FORMAT_DOUBLE, &t);
     }
 }
 
 void playPausePressed(NSButton *btn) {
     if (!mpv) return;
-    int paused = 0;
+    int paused=0;
     mpv_get_property(mpv, "pause", MPV_FORMAT_FLAG, &paused);
-    paused = !paused;
+    paused=!paused;
     mpv_set_property(mpv, "pause", MPV_FORMAT_FLAG, &paused);
     dispatch_async(dispatch_get_main_queue(), ^{
-        [btn setTitle: paused ? @"Play" : @"Pause" ];
+        [btn setTitle: paused?@"Play":@"Pause" ];
     });
 }
 
-#pragma mark –– DCPCALL entry points
+#pragma mark –– DCPCALL
 
 HWND DCPCALL ListLoad(HWND parentWin, char* fileToLoad, int showFlags) {
-    NSView *hostView = (__bridge NSView*)(void*)parentWin;
-    NSRect frame     = hostView.bounds;
+    NSView *host=(__bridge NSView*)(void*)parentWin;
+    NSRect frame=host.bounds;
 
-    // 1) Init MPV
-    mpv = mpv_create();
-    mpv_initialize(mpv);
-    mpv_set_option_string(mpv, "vo", "gpu");
-
-    // 2) Create OpenGL callback context
+    mpv = mpv_create(); mpv_initialize(mpv);
+    mpv_set_option_string(mpv,"vo","gpu");
     mpv_gl = mpv_get_sub_api(mpv, MPV_SUB_API_OPENGL_CB);
-    mpv_opengl_cb_init_gl(mpv_gl, NULL, NULL);
+    // updated mpv_opengl_cb_init_gl signature: pass GL context proc as NULL
+    mpv_opengl_cb_init_gl(mpv_gl, NULL, NULL, NULL);
 
-    // 3) Setup GL view
-    NSOpenGLPixelFormatAttribute attrs[] = {
-        NSOpenGLPFAAccelerated,
-        NSOpenGLPFAColorSize, 24,
-        NSOpenGLPFADepthSize, 16,
-        0
-    };
-    NSOpenGLPixelFormat *fmt = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
-    glView = [[MpvGLView alloc] initWithFrame:frame pixelFormat:fmt];
-    glView.mpv_gl = mpv_gl;
-
+    // OpenGL view
+    NSOpenGLPixelFormatAttribute attrs[]={ NSOpenGLPFAAccelerated,
+        NSOpenGLPFAColorSize,24, NSOpenGLPFADepthSize,16, 0 };
+    NSOpenGLPixelFormat *fmt=[[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
+    glView=[[MpvGLView alloc] initWithFrame:frame pixelFormat:fmt];
+    glView.mpv_gl=mpv_gl;
     mpv_opengl_cb_set_update_callback(mpv_gl,
-        [](void *ctx){
-            MpvGLView *v = (__bridge MpvGLView*)ctx;
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [v setNeedsDisplay:YES];
-            });
+        [](void*ctx){
+            MpvGLView *v=(__bridge MpvGLView*)ctx;
+            dispatch_async(dispatch_get_main_queue(),^{ [v setNeedsDisplay:YES]; });
         }, (__bridge void*)glView);
 
-    // 4) UI Controller + widgets
-    controller   = [[MpvController alloc] init];
-    seekSlider   = [[NSSlider alloc] initWithFrame:NSMakeRect(10,10,frame.size.width-20,20)];
-    seekSlider.minValue = 0; seekSlider.maxValue = 100;
-    seekSlider.target   = controller; seekSlider.action   = @selector(sliderChanged:);
-    playPauseBtn = [[NSButton alloc] initWithFrame:NSMakeRect(10,40,80,30)];
+    controller=[[MpvController alloc]init];
+    seekSlider=[[NSSlider alloc]initWithFrame:NSMakeRect(10,10,frame.size.width-20,20)];
+    seekSlider.minValue=0; seekSlider.maxValue=100;
+    seekSlider.target=controller; seekSlider.action=@selector(sliderChanged:);
+    playPauseBtn=[[NSButton alloc]initWithFrame:NSMakeRect(10,40,80,30)];
     [playPauseBtn setTitle:@"Pause"];
-    playPauseBtn.target = controller; playPauseBtn.action = @selector(buttonClicked:);
+    playPauseBtn.target=controller; playPauseBtn.action=@selector(buttonClicked:);
 
-    // 5) Load file and start timer
-    const char *cmd[] = {"loadfile", fileToLoad, NULL};
-    mpv_command(mpv, cmd);
+    const char *cmd[]={"loadfile",fileToLoad,NULL};
+    mpv_command(mpv,cmd);
     [NSTimer scheduledTimerWithTimeInterval:1.0
                                      target:controller
                                    selector:@selector(updateSeekTimer:)
-                                   userInfo:nil
-                                    repeats:YES];
+                                   userInfo:nil repeats:YES];
 
-    // 6) Add to host panel
-    [hostView addSubview:glView];
-    [hostView addSubview:seekSlider];
-    [hostView addSubview:playPauseBtn];
-
+    [host addSubview:glView];
+    [host addSubview:seekSlider];
+    [host addSubview:playPauseBtn];
     return (__bridge HWND)glView;
 }
 
-void DCPCALL ListCloseWindow(HWND listWin) {
-    if (mpv) {
-        mpv_terminate_destroy(mpv);
-        mpv = NULL;
-    }
-    if (glView)       { [glView removeFromSuperview];       glView       = nil; }
-    if (seekSlider)   { [seekSlider removeFromSuperview];   seekSlider   = nil; }
-    if (playPauseBtn) { [playPauseBtn removeFromSuperview]; playPauseBtn = nil; }
-    controller = nil;
+void DCPCALL ListCloseWindow(HWND win) {
+    if(mpv){ mpv_terminate_destroy(mpv); mpv=NULL; }
+    if(glView){ [glView removeFromSuperview]; glView=nil; }
+    if(seekSlider){ [seekSlider removeFromSuperview]; seekSlider=nil; }
+    if(playPauseBtn){ [playPauseBtn removeFromSuperview]; playPauseBtn=nil; }
+    controller=nil;
 }
 
-void DCPCALL ListGetDetectString(char* DetectString, int maxlen) {
-    snprintf(DetectString, maxlen, EXTENSIONS_MEDIA);
+void DCPCALL ListGetDetectString(char *s,int maxlen){
+    snprintf(s,maxlen,EXTENSIONS_MEDIA);
 }
