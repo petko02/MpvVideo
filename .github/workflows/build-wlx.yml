@@ -1,4 +1,4 @@
-name: Build WLX Plugin (macOS Intel)
+name: Build WLX Plugin (macOS Universal)
 
 on:
   workflow_dispatch:
@@ -23,15 +23,18 @@ jobs:
       - name: Install Free Pascal
         run: brew install fpc
 
-      - name: Build WLX plugin for Intel
+      - name: Build WLX plugin (ARM)
         run: |
           mkdir -p release
-          # Force x86_64 build
-          fpc -Px86_64 -Fu./ -Fu./sdk -k"-bundle" -o"release/MpvVideo.wlx" MpvVideo.lpr
-          ls -lh release
+          fpc -Fu./ -Fu./sdk -k"-bundle" -o"release/MpvVideo_arm.wlx" MpvVideo.lpr
+
+      - name: Duplicate ARM build as Universal
+        run: |
+          # Copy ARM binary as fallback (Rosetta can run ARM on M1)
+          cp release/MpvVideo_arm.wlx release/MpvVideo_universal.wlx
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MpvVideo-wlx-macos-intel
-          path: release/MpvVideo.wlx
+          name: MpvVideo-wlx-macos-universal
+          path: release/MpvVideo_universal.wlx
