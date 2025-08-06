@@ -3,13 +3,14 @@ name: Build WLX Plugin (Embedded mpv, macOS)
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: macos-latest
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install runtime
@@ -21,7 +22,8 @@ jobs:
         run: |
           curl -L -o mpv.tar.gz https://github.com/mpv-player/mpv/archive/refs/tags/v0.40.0.tar.gz
           tar -xzf mpv.tar.gz
-          mv mpv-0.40.0/libmpv mpv-headers
+          mkdir -p mpv-headers
+          cp -r mpv-0.40.0/libmpv/include/mpv mpv-headers/
 
       - name: Build WLX plugin bundle
         run: |
@@ -32,7 +34,6 @@ jobs:
             -o release/MpvVideo/MpvVideo.wlx \
             mpvvideo.c $(pkg-config --cflags --libs mpv)
 
-          # Copy libmpv.dylib for portability
           cp $(brew --prefix)/lib/libmpv.dylib release/MpvVideo/
           install_name_tool -change libmpv.dylib \
               @loader_path/libmpv.dylib release/MpvVideo/MpvVideo.wlx || true
