@@ -1,4 +1,4 @@
-name: Build MpvVideo WLX Plugin
+name: Build MpvVideo.wlx
 
 on:
   push:
@@ -14,45 +14,39 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install pkg-config jpeg libass lua uchardet ffmpeg
+          brew install mpv meson ninja pkg-config jpeg automake autoconf libtool python@3.12
 
-      - name: Clone full mpv repo with headers
+      - name: Download mpv source
         run: |
-          git clone --depth=1 --branch v0.34.0 https://github.com/mpv-player/mpv.git mpv-full
+          git clone --depth=1 https://github.com/mpv-player/mpv.git mpv-full
           mkdir -p mpv-headers
+          cp -r mpv-full/libmpv mpv-headers/
           cp -r mpv-full/include/mpv mpv-headers/
-          cp -r mpv-full/libmpv/*.h mpv-headers/
 
-      - name: Build libmpv.dylib (minimal build)
-        run: |
-          cd mpv-full
-          ./bootstrap.py
-          ./waf configure --disable-cplayer --enable-libmpv-shared --prefix=$PWD/../mpv-local
-          ./waf build
-          ./waf install
-          cd ..
-          echo "PKG_CONFIG_PATH=$PWD/mpv-local/lib/pkgconfig" >> $GITHUB_ENV
-          echo "DYLD_LIBRARY_PATH=$PWD/mpv-local/lib" >> $GITHUB_ENV
+      - name: Export mpv header path
+        run: echo "CFLAGS=-I$PWD/mpv-headers/include" >> $GITHUB_ENV
 
-      - name: Patch BOOL typedef and detect function
+      - name: Patch BOOL typedef and ListGetDetectString
         run: |
-          sed -i '' '1s;^;#ifndef __OBJC__\n#define __OBJC__\n#include <stdbool.h>\ntypedef int BOOL;\n#endif\n;' mpvvideo.c
+          sed -i '' '1i\
+#ifndef __OBJC__\
+typedef int BOOL;\
+#endif' mpvvideo.c
           sed -i '' 's/int DCPCALL ListGetDetectString/void DCPCALL ListGetDetectString/' mpvvideo.c
 
       - name: Compile mpvvideo.c
         run: |
           mkdir -p release/MpvVideo
-          clang -shared -fPIC -I./mpv-headers \
-            -framework Cocoa -framework OpenGL \
-            -o release/MpvVideo/mpvvideo.wlx mpvvideo.c \
-            mpv-local/lib/libmpv.dylib
+          clang -mmacosx-version-min=10.15 -Wall -framework Cocoa -I./mpv-headers/include -fPIC -shared -o release/MpvVideo/mpvvideo.wlx64 mpvvideo.c -lmpv
 
-      - name: Copy libmpv.dylib to release folder
+      - name: Copy files to release
         run: |
-          cp mpv-local/lib/libmpv.dylib release/MpvVideo/
+          cp mpvvideo.txt release/MpvVideo/
+          cp mpvvideo.inf release/MpvVideo/
+          cp LICENSE release/MpvVideo/
 
-      - name: Upload release artifact
+      - name: Upload release ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: MpvVideo-macOS
-          path: release/MpvVideo/
+          name: MpvVideo-wlx
+          path: release/MpvVideo
