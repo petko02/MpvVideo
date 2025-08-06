@@ -12,8 +12,7 @@ typedef struct { uint32_t dwLowDateTime, dwHighDateTime; } FILETIME;
 #import "common.h"
 #import "wlxplugin.h"
 #import <mpv/client.h>
-// ← **Import the sub-API header from the top-level include path**  
-#import <opengl_cb.h>
+#import <mpv/opengl_cb.h>   // back to the correct path
 
 #ifndef EXTENSIONS_MEDIA
 #define EXTENSIONS_MEDIA "*.mp4;*.mkv;*.avi;*.mov;*.webm"
@@ -27,14 +26,12 @@ typedef struct { uint32_t dwLowDateTime, dwHighDateTime; } FILETIME;
 @implementation MpvGLView
 - (void)drawRect:(NSRect)dirtyRect {
     if (_mpv_gl) {
-        // mpv_opengl_cb_draw now takes 4 args: ctx, fbo, width, height
         NSRect r = self.bounds;
         mpv_opengl_cb_draw(_mpv_gl, 0, r.size.width, r.size.height);
     }
 }
 - (void)dealloc {
     if (_mpv_gl) {
-        // new signature takes ctx, glProc, fbo, etc.; pass NULLs/defaults
         mpv_opengl_cb_uninit_gl(_mpv_gl);
         _mpv_gl = NULL;
     }
@@ -101,10 +98,8 @@ HWND DCPCALL ListLoad(HWND parentWin, char* fileToLoad, int showFlags) {
     mpv = mpv_create(); mpv_initialize(mpv);
     mpv_set_option_string(mpv,"vo","gpu");
     mpv_gl = mpv_get_sub_api(mpv, MPV_SUB_API_OPENGL_CB);
-    // updated mpv_opengl_cb_init_gl signature: pass GL context proc as NULL
     mpv_opengl_cb_init_gl(mpv_gl, NULL, NULL, NULL);
 
-    // OpenGL view
     NSOpenGLPixelFormatAttribute attrs[]={ NSOpenGLPFAAccelerated,
         NSOpenGLPFAColorSize,24, NSOpenGLPFADepthSize,16, 0 };
     NSOpenGLPixelFormat *fmt=[[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
