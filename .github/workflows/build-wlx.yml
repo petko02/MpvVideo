@@ -1,4 +1,4 @@
-name: Build WLX Plugin (macOS ARM, FPC 3.3.1 via GitHub Mirror)
+name: Build WLX Plugin (macOS ARM, FPC 3.3.1 via SVN)
 
 on:
   workflow_dispatch:
@@ -21,15 +21,11 @@ jobs:
           fi
 
       - name: Install build dependencies
-        run: brew install fpc make git
+        run: brew install fpc make svn git
 
-      - name: Clone Free Pascal 3.3.1 (GitHub mirror)
-        uses: actions/checkout@v4
-        with:
-          repository: graemeg/freepascal
-          ref: main
-          path: fpc-source
-          fetch-depth: 1
+      - name: Download Free Pascal 3.3.1 (SVN)
+        run: |
+          svn checkout https://svn.freepascal.org/svn/fpc/trunk fpc-source
 
       - name: Generate Makefiles
         run: |
