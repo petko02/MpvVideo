@@ -30,7 +30,6 @@ static void mpv_update_callback(void *ctx);
 @interface MpvGLView : NSOpenGLView
 @property (nonatomic, assign) mpv_opengl_cb_context *mpv_gl;
 @end
-
 @implementation MpvGLView
 - (void)drawRect:(NSRect)dirtyRect {
     if (self.mpv_gl) {
@@ -119,14 +118,12 @@ HWND DCPCALL ListLoad(HWND parentWin, char* fileToLoad, int showFlags) {
     mpv_initialize(mpv);
     mpv_set_option_string(mpv, "vo", "gpu");
 
-    // 2) opengl-cb sub-API
-    mpv_gl = mpv_get_sub_api(mpv, MPV_SUB_API_OPENGL_CB);
+    // 2) opengl-cb sub-API: use literal name
+    mpv_gl = mpv_get_sub_api(mpv, "opengl-cb");
     mpv_opengl_cb_init_gl(mpv_gl, NULL, NULL, NULL);
-
-    // 3) set update callback
     mpv_opengl_cb_set_update_callback(mpv_gl, mpv_update_callback, (__bridge void*)glView);
 
-    // 4) create GL view
+    // 3) create GL view
     NSOpenGLPixelFormatAttribute attrs[] = {
       NSOpenGLPFAAccelerated,
       NSOpenGLPFAColorSize,   24,
@@ -137,18 +134,18 @@ HWND DCPCALL ListLoad(HWND parentWin, char* fileToLoad, int showFlags) {
     glView = [[MpvGLView alloc] initWithFrame:frame pixelFormat:fmt];
     glView.mpv_gl = mpv_gl;
 
-    // 5) controls
-    controller   = [[MpvController alloc] init];
-    seekSlider   = [[NSSlider alloc] initWithFrame:NSMakeRect(10,10,frame.size.width-20,20)];
+    // 4) controls
+    controller = [[MpvController alloc] init];
+    seekSlider = [[NSSlider alloc] initWithFrame:NSMakeRect(10,10,frame.size.width-20,20)];
     seekSlider.minValue = 0; seekSlider.maxValue = 100;
-    seekSlider.target   = controller; seekSlider.action   = @selector(sliderChanged:);
+    seekSlider.target = controller; seekSlider.action = @selector(sliderChanged:);
     playPauseBtn = [[NSButton alloc] initWithFrame:NSMakeRect(10,40,80,30)];
     [playPauseBtn setTitle:@"Pause"];
     playPauseBtn.target = controller; playPauseBtn.action = @selector(buttonClicked:);
     [glView addSubview:seekSlider];
     [glView addSubview:playPauseBtn];
 
-    // 6) load file + timer
+    // 5) load file & timer
     const char *cmd[] = {"loadfile", fileToLoad, NULL};
     mpv_command(mpv, cmd);
     [NSTimer scheduledTimerWithTimeInterval:1.0
@@ -157,7 +154,7 @@ HWND DCPCALL ListLoad(HWND parentWin, char* fileToLoad, int showFlags) {
                                    userInfo:nil
                                     repeats:YES];
 
-    // 7) embed
+    // 6) embed view
     [hostView addSubview:glView];
     return (__bridge HWND)glView;
 }
