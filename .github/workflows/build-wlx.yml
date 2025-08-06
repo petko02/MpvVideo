@@ -11,35 +11,32 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
       - name: Install dependencies
         run: |
           brew update
-          brew install mpv coreutils
-
-      - name: Organize headers
-        run: |
-          mkdir -p mpv
-          cp client.h    mpv/client.h
-          cp opengl_cb.h mpv/opengl_cb.h
+          brew install mpv pkg-config coreutils
 
       - name: Prepare plugin directory
         run: mkdir -p MpvVideo.wlx
 
       - name: Compile Objective-C++
         run: |
-          PREFIX=$(brew --prefix)
+          # Let pkg-config tell us where mpv.pc lives and what flags to use
+          export PKG_CONFIG_PATH="$(brew --prefix mpv)/lib/pkgconfig:${PKG_CONFIG_PATH}"
+          CFLAGS="$(pkg-config --cflags mpv)"
+          LDFLAGS="$(pkg-config --libs mpv)"
           clang++ -ObjC++ -Wall -O2 -fPIC \
+            $CFLAGS \
             -I. \
-            -I"${PREFIX}/include" \
-            -L"${PREFIX}/lib" \
             -framework Cocoa \
             -framework QuartzCore \
             -framework OpenGL \
             mpvvideo.mm \
             -dynamiclib -o MpvVideo.wlx/libmpvvideo.dylib \
-            -lmpv
+            $LDFLAGS
 
       - name: Package for release
         run: |
@@ -49,7 +46,8 @@ jobs:
           cp README.md release/MpvVideo/      || true
           cd release && zip -r MpvVideo.zip MpvVideo
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: MpvVideo
           path: release/MpvVideo.zip
