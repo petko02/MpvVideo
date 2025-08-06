@@ -24,11 +24,13 @@ jobs:
 
       - name: Compile Objective-C++
         run: |
-          # Detect mpv’s Homebrew prefix (Intel vs ARM) so headers and libs are found :contentReference[oaicite:0]{index=0}
+          # Detect mpv’s Homebrew prefix (Intel vs ARM)
           PREFIX=$(brew --prefix mpv)
           clang++ -ObjC++ -Wall -O2 -fPIC \
             -I. \
             -I"${PREFIX}/include" \
+            -I/usr/local/include \
+            -I/opt/homebrew/include \
             -L"${PREFIX}/lib" \
             -framework Cocoa \
             -framework QuartzCore \
