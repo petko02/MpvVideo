@@ -23,12 +23,19 @@ jobs:
             -o libMpvPlayerView.dylib MpvPlayerView.mm \
             -arch x86_64 -arch arm64
 
-      - name: 🧠 Compile WLX Plugin (Free Pascal)
+      - name: 🧠 Compile WLX Plugin (Free Pascal Universal Build)
         run: |
-          fpc -Px86_64 -XR/Library/Developer/CommandLineTools/usr/bin/ MpvVideo.pas -Fu. -oMpvVideo_x64.wlx
-          fpc -Parm64 -XR/Library/Developer/CommandLineTools/usr/bin/ MpvVideo.pas -Fu. -oMpvVideo_arm64.wlx
+          SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
 
-      - name: 🧬 Merge into Universal WLX Plugin
+          fpc -Px86_64 -XR"$SDKROOT"/usr/bin -Fl"$SDKROOT"/usr/lib \
+              -k"-isysroot" -k"$SDKROOT" \
+              -Fu. -oMpvVideo_x64.wlx MpvVideo.pas
+
+          fpc -Parm64 -XR"$SDKROOT"/usr/bin -Fl"$SDKROOT"/usr/lib \
+              -k"-isysroot" -k"$SDKROOT" \
+              -Fu. -oMpvVideo_arm64.wlx MpvVideo.pas
+
+      - name: 🧬 Merge into Universal WLX Binary
         run: |
           lipo -create -output MpvVideo.wlx MpvVideo_x64.wlx MpvVideo_arm64.wlx
           file MpvVideo.wlx
@@ -40,16 +47,19 @@ jobs:
           cp MpvVideo.wlx MpvVideo_Package/
           cp libMpvPlayerView.dylib MpvVideo_Package/
 
-          # Optional: Include your existing libmpv.dylib (must be universal)
+          # Optional: Include existing universal libmpv.dylib if present
           if [ -f libmpv.dylib ]; then
             cp libmpv.dylib MpvVideo_Package/
+          fi
+          if [ -f libmpv.2.dylib ]; then
+            cp libmpv.2.dylib MpvVideo_Package/
           fi
 
       - name: 🗜️ Create ZIP archive
         run: |
           zip -r MpvVideo_macOS_Universal.zip MpvVideo_Package
 
-      - name: 📤 Upload Artifact
+      - name: 📤 Upload Plugin ZIP Artifact
         uses: actions/upload-artifact@v4
         with:
           name: MpvVideo_WLX_Plugin
