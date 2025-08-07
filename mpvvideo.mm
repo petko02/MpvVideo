@@ -4,17 +4,22 @@
 #import <mpv/client.h>
 #import <mpv/opengl_cb.h>
 
-// Declare manually (since not in header)
-extern void *mpv_get_sub_api(mpv_handle *ctx, int sub_api);
+#ifndef MPV_SUB_API_OPENGL_CB
 #define MPV_SUB_API_OPENGL_CB 1
+#endif
+
+// Forward declare mpv_get_sub_api
+extern void *mpv_get_sub_api(mpv_handle *ctx, int sub_api);
 
 @interface MpvGLView : NSOpenGLView {
     mpv_handle *mpv;
     mpv_opengl_cb_context *mpv_gl;
+    NSSlider *slider;
     NSButton *playPauseButton;
-    NSSlider *seekSlider;
+    NSTimer *timer;
     BOOL isPlaying;
 }
+
 @end
 
 @implementation MpvGLView
@@ -31,67 +36,88 @@ extern void *mpv_get_sub_api(mpv_handle *ctx, int sub_api);
     NSOpenGLPixelFormat *fmt = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
     self = [super initWithFrame:frame pixelFormat:fmt];
     if (self) {
-        mpv = mpv_create();
-        mpv_initialize(mpv);
-
-        mpv_gl = (mpv_opengl_cb_context *)mpv_get_sub_api(mpv, MPV_SUB_API_OPENGL_CB);
-        mpv_opengl_cb_init_gl(mpv_gl, NULL, NULL, NULL);
-
-        mpv_opengl_cb_set_update_callback(mpv_gl, ^(void *) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [self setNeedsDisplay:YES];
-            });
-        }, NULL);
-
-        const char *cmd[] = {"loadfile", "sample.mp4", NULL};
-        mpv_command_async(mpv, 0, cmd);
-
-        // Create play/pause button
-        playPauseButton = [[NSButton alloc] initWithFrame:NSMakeRect(10, 10, 80, 30)];
-        [playPauseButton setTitle:@"Play"];
-        [playPauseButton setButtonType:NSButtonTypeMomentaryPushIn];
-        [playPauseButton setBezelStyle:NSBezelStyleRounded];
-        [playPauseButton setTarget:self];
-        [playPauseButton setAction:@selector(togglePlayPause:)];
-        [self addSubview:playPauseButton];
-
-        // Create seek bar
-        seekSlider = [[NSSlider alloc] initWithFrame:NSMakeRect(100, 10, frame.size.width - 120, 30)];
-        [seekSlider setMinValue:0];
-        [seekSlider setMaxValue:100];
-        [seekSlider setTarget:self];
-        [seekSlider setAction:@selector(seek:)];
-        [self addSubview:seekSlider];
-
-        isPlaying = YES;
+        [self prepareUI];
+        [self setupMPV];
     }
     return self;
 }
 
-- (void)drawRect:(NSRect)dirtyRect {
-    [super drawRect:dirtyRect];
-    mpv_opengl_cb_draw(mpv_gl, 0, dirtyRect.size.width, dirtyRect.size.height);
+- (void)prepareUI {
+    slider = [[NSSlider alloc] initWithFrame:NSMakeRect(10, 10, self.bounds.size.width - 20, 20)];
+    slider.minValue = 0.0;
+    slider.maxValue = 100.0;
+    [slider setTarget:self];
+    [slider setAction:@selector(sliderMoved:)];
+    [self addSubview:slider];
+
+    playPauseButton = [[NSButton alloc] initWithFrame:NSMakeRect(10, 40, 100, 30)];
+    [playPauseButton setTitle:@"Play"];
+    [playPauseButton setButtonType:NSButtonTypeMomentaryPushIn];
+    [playPauseButton setBezelStyle:NSBezelStyleRounded];
+    [playPauseButton setTarget:self];
+    [playPauseButton setAction:@selector(togglePlayPause)];
+    [self addSubview:playPauseButton];
 }
 
-- (void)togglePlayPause:(id)sender {
+- (void)setupMPV {
+    mpv = mpv_create();
+    mpv_initialize(mpv);
+
+    mpv_gl = (mpv_opengl_cb_context *)mpv_get_sub_api(mpv, MPV_SUB_API_OPENGL_CB);
+    mpv_opengl_cb_init_gl(mpv_gl, NULL, NULL, NULL);
+
+    mpv_opengl_cb_set_update_callback(mpv_gl,
+        [](void *ctx) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [(MpvGLView *)ctx setNeedsDisplay:YES];
+            });
+        },
+        (__bridge void *)self
+    );
+
+    const char *cmd[] = {"loadfile", "test.mp4", NULL};
+    mpv_command_async(mpv, 0, cmd);
+    isPlaying = YES;
+
+    timer = [NSTimer scheduledTimerWithTimeInterval:0.5
+                                             target:self
+                                           selector:@selector(updateSlider)
+                                           userInfo:nil
+                                            repeats:YES];
+}
+
+- (void)sliderMoved:(id)sender {
+    double percent = [slider doubleValue];
+    const char *cmd[] = {"seek", [[NSString stringWithFormat:@"%f", percent] UTF8String], "absolute-percent", NULL};
+    mpv_command_async(mpv, 0, cmd);
+}
+
+- (void)togglePlayPause {
+    isPlaying = !isPlaying;
     const char *cmd[] = {"cycle", "pause", NULL};
     mpv_command_async(mpv, 0, cmd);
-    isPlaying = !isPlaying;
     [playPauseButton setTitle:(isPlaying ? @"Pause" : @"Play")];
 }
 
-- (void)seek:(id)sender {
-    double value = [seekSlider doubleValue];
-    char time[64];
-    snprintf(time, sizeof(time), "%f", value);
-    const char *cmd[] = {"seek", time, "absolute", NULL};
-    mpv_command_async(mpv, 0, cmd);
+- (void)updateSlider {
+    mpv_node node;
+    if (mpv_get_property(mpv, "percent-pos", MPV_FORMAT_NODE, &node) >= 0) {
+        if (node.format == MPV_FORMAT_DOUBLE)
+            [slider setDoubleValue:node.u.double_];
+        mpv_free_node_contents(&node);
+    }
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+    [super drawRect:dirtyRect];
+    mpv_opengl_cb_draw(mpv_gl, 0, self.bounds.size.width, self.bounds.size.height);
+    [[self openGLContext] flushBuffer];
 }
 
 @end
 
-void* ListLoad(void* hwndParent, int fFlags, const char* filename, const void* file) {
-    NSRect frame = NSMakeRect(0, 0, 800, 600);
+void* ListLoad(HWND hwndParent, int fFlags, const char* filename, const void* file) {
+    NSRect frame = NSMakeRect(0, 0, 640, 480);
     MpvGLView *view = [[MpvGLView alloc] initWithFrame:frame];
     return (__bridge_retained void *)view;
 }
