@@ -1,30 +1,23 @@
-#import <Cocoa/Cocoa.h>
+extern "C" void* ListLoad(void* hwndParent, int showFlags, char* fileToLoad, struct ListDefaultParamStruct* lps) {
+    @autoreleasepool {
+        // Determine preview size
+        NSRect frame = NSMakeRect(0, 0, lps ? lps->size.cx : 640, lps ? lps->size.cy : 360);
+        
+        // Create embedded OpenGL view
+        MpvGLView *view = [[MpvGLView alloc] initWithFrame:frame];
+        if (!view) return nullptr;
 
-@interface DummyView : NSView @end
-@implementation DummyView
-- (void)drawRect:(NSRect)dirtyRect {
-    [[NSColor redColor] setFill];
-    NSRectFill(dirtyRect);
-}
-@end
+        // Attach to parent view (required for Double Commander embedding)
+        NSView *parent = (__bridge NSView *)hwndParent;
+        [parent addSubview:view];
 
-extern "C" void* ListLoad(void* hwndParent, int showFlags, char* fileToLoad, void* lps) {
-    NSRect frame = NSMakeRect(0, 0, 640, 360);
-    DummyView *view = [[DummyView alloc] initWithFrame:frame];
-    return (__bridge_retained void *)view;
-}
+        // Load file (if present)
+        if (fileToLoad) {
+            const char *cmd[] = {"loadfile", fileToLoad, NULL};
+            mpv_command([view getMPV], cmd);
+        }
 
-extern "C" int ListGetDetectString(char *DetectString, int maxlen) {
-    snprintf(DetectString, maxlen, "EXT=\"MP4\"|EXT=\"MKV\"");
-    return 0;
-}
-
-extern "C" int ListLoadNext(void* listWin, const char* filename, int showFlags) { return 0; }
-extern "C" int ListSearchText(void* listWin, const char* searchString, int searchParameter) { return 0; }
-extern "C" int ListSearchDialog(void* listWin, int findNext) { return 0; }
-extern "C" int ListSendCommand(void* listWin, int command, int parameter) { return 0; }
-
-extern "C" void ListCloseWindow(void* listWin) {
-    NSView *view = (__bridge_transfer NSView *)listWin;
-    [view removeFromSuperview];
+        // Return pointer to the view
+        return (__bridge_retained void *)view;
+    }
 }
