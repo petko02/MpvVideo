@@ -31,11 +31,11 @@ int (*mpv_opengl_cb_draw_fn)(mpv_opengl_cb_context *, int, int, int) = NULL;
 + (void)initialize {
     void *handle = dlopen(NULL, RTLD_LAZY | RTLD_LOCAL);
     if (handle) {
-        mpv_get_sub_api_fn = dlsym(handle, "mpv_get_sub_api");
-        mpv_opengl_cb_init_gl_fn = dlsym(handle, "mpv_opengl_cb_init_gl");
-        mpv_opengl_cb_uninit_gl_fn = dlsym(handle, "mpv_opengl_cb_uninit_gl");
-        mpv_opengl_cb_set_update_callback_fn = dlsym(handle, "mpv_opengl_cb_set_update_callback");
-        mpv_opengl_cb_draw_fn = dlsym(handle, "mpv_opengl_cb_draw");
+        mpv_get_sub_api_fn = (void *(*)(mpv_handle *, int))dlsym(handle, "mpv_get_sub_api");
+        mpv_opengl_cb_init_gl_fn = (int (*)(mpv_opengl_cb_context *, void *, void *, void *))dlsym(handle, "mpv_opengl_cb_init_gl");
+        mpv_opengl_cb_uninit_gl_fn = (void (*)(mpv_opengl_cb_context *))dlsym(handle, "mpv_opengl_cb_uninit_gl");
+        mpv_opengl_cb_set_update_callback_fn = (void (*)(mpv_opengl_cb_context *, void (*)(void *), void *))dlsym(handle, "mpv_opengl_cb_set_update_callback");
+        mpv_opengl_cb_draw_fn = (int (*)(mpv_opengl_cb_context *, int, int, int))dlsym(handle, "mpv_opengl_cb_draw");
     }
 }
 
@@ -90,7 +90,7 @@ int (*mpv_opengl_cb_draw_fn)(mpv_opengl_cb_context *, int, int, int) = NULL;
 
 void on_mpv_update(void *ctx) {
     dispatch_async(dispatch_get_main_queue(), ^{
-        [(MpvGLView *)ctx drawView];
+        [(MpvGLView *)__bridge MpvGLView * ctx drawView];
     });
 }
 
