@@ -1,65 +1,42 @@
 #import <Cocoa/Cocoa.h>
-#import <Quartz/Quartz.h>
-#import <QuickLook/QuickLook.h>
 
 extern "C" {
 
-// Simple preview item
-@interface SimpleQLItem : NSObject <QLPreviewItem>
-@property NSURL *url;
-@end
-
-@implementation SimpleQLItem
-- (NSURL *)previewItemURL {
-    return self.url;
-}
-@end
-
-// Load plugin
+// Entry: Load plugin (shows a blank view)
 void* ListLoad(void* hwndParent, int showFlags, char* fileToLoad, void* lps) {
     @autoreleasepool {
-        if (!fileToLoad) return nullptr;
-
+        // Cast hwndParent to NSView
         NSView *parent = (__bridge NSView *)hwndParent;
-        NSRect frame = NSMakeRect(0, 0, 640, 360);
 
-        QLPreviewView *preview = [[QLPreviewView alloc] initWithFrame:frame style:QLPreviewViewStyleNormal];
-        preview.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+        // Create a blank NSView to embed
+        NSView *view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 640, 360)];
+        view.wantsLayer = YES;
+        view.layer.backgroundColor = [[NSColor blackColor] CGColor];
 
-        SimpleQLItem *item = [SimpleQLItem new];
-        item.url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:fileToLoad]];
-        [preview setPreviewItem:item];
+        // Add to parent
+        [parent addSubview:view];
 
-        [parent addSubview:preview];
-        return (__bridge_retained void *)preview;
+        // Return plugin handle
+        return (__bridge_retained void *)view;
     }
 }
 
-// Load next file
+// Entry: Load next file (no-op)
 int ListLoadNext(void* parentWin, void* pluginWin, char* fileToLoad, int showFlags) {
-    @autoreleasepool {
-        if (!fileToLoad || !pluginWin) return 1;
-
-        QLPreviewView *preview = (__bridge QLPreviewView *)pluginWin;
-        SimpleQLItem *item = [SimpleQLItem new];
-        item.url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:fileToLoad]];
-        [preview setPreviewItem:item];
-
-        return 0;
-    }
+    return 0; // success
 }
 
-// Cleanup
+// Entry: Close and remove view
 void ListCloseWindow(void* pluginWin) {
     @autoreleasepool {
-        QLPreviewView *preview = (__bridge_transfer QLPreviewView *)pluginWin;
-        [preview removeFromSuperview];
+        NSView *view = (__bridge_transfer NSView *)pluginWin;
+        [view removeFromSuperview];
     }
 }
 
-// Set detection string
+// Entry: Detect supported files
 void ListGetDetectString(char* detectString, int maxlen) {
-    snprintf(detectString, maxlen, "EXT=\"PDF\"|EXT=\"JPG\"|EXT=\"PNG\"|EXT=\"TXT\"");
+    snprintf(detectString, maxlen, "EXT=\"MP4\"");
 }
 
 }
