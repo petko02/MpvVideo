@@ -2,22 +2,20 @@
 #import <AVKit/AVKit.h>
 #import <AVFoundation/AVFoundation.h>
 
-extern "C" {
-
-// Global pointer to the player view so we can clean up
 static AVPlayerView *playerView = nil;
 
-// WLX entry point
-void* ListLoad(void* hwndParent, int showFlags, char* fileToLoad, void* lps) {
-    @autoreleasepool {
-        if (!fileToLoad || !hwndParent) return nullptr;
+extern "C" {
 
-        NSString *filePath = [NSString stringWithUTF8String:fileToLoad];
+void* __attribute__((visibility("default"))) ListLoad(void* ParentWin, int ShowFlags, char* FileToLoad, void* ListerPluginStruct) {
+    @autoreleasepool {
+        if (!ParentWin || !FileToLoad) return nullptr;
+
+        NSString *filePath = [NSString stringWithUTF8String:FileToLoad];
         NSURL *videoURL = [NSURL fileURLWithPath:filePath];
 
-        NSView *parent = (__bridge NSView *)hwndParent;
-
+        NSView *parent = (__bridge NSView *)ParentWin;
         NSRect frame = parent.bounds;
+
         playerView = [[AVPlayerView alloc] initWithFrame:frame];
         playerView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
         playerView.controlsStyle = AVPlayerViewControlsStyleDefault;
@@ -32,7 +30,7 @@ void* ListLoad(void* hwndParent, int showFlags, char* fileToLoad, void* lps) {
     }
 }
 
-void ListCloseWindow(void* listWin) {
+void __attribute__((visibility("default"))) ListCloseWindow(void* listWin) {
     @autoreleasepool {
         if (listWin) {
             NSView *view = (__bridge_transfer NSView *)listWin;
@@ -42,9 +40,9 @@ void ListCloseWindow(void* listWin) {
     }
 }
 
-int ListGetDetectString(char* DetectString, int maxlen) {
+int __attribute__((visibility("default"))) ListGetDetectString(char* DetectString, int maxlen) {
     snprintf(DetectString, maxlen, "EXT=\"MP4\"|EXT=\"MOV\"|EXT=\"MKV\"|EXT=\"AVI\"|EXT=\"WMV\"");
     return 0;
 }
 
-}
+} // extern "C"
