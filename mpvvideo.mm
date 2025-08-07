@@ -4,6 +4,11 @@
 #import "mpv/client.h"
 #import "mpv/opengl_cb.h"
 
+// Patch for missing sub API constant (manual declaration)
+#ifndef MPV_SUB_API_OPENGL_CB
+#define MPV_SUB_API_OPENGL_CB 1
+#endif
+
 @interface MpvGLView : NSOpenGLView {
     mpv_handle *mpv;
     mpv_opengl_cb_context *mpv_gl;
@@ -131,7 +136,7 @@ void* ListLoad(void* hwndParent, int fFlags, const char* filename, const void* f
 
         if (filename) {
             const char *cmd[] = {"loadfile", filename, NULL};
-            mpv_command(view->->mpv, cmd);
+            mpv_command(view->mpv, cmd);
         }
 
         return (__bridge_retained void *)view;
