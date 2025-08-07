@@ -1,58 +1,65 @@
 #import <Cocoa/Cocoa.h>
 #import <Quartz/Quartz.h>
-
-#define LISTPLUGIN_OK 0
-#define LISTPLUGIN_ERROR 1
+#import <QuickLook/QuickLook.h>
 
 extern "C" {
 
-// Simple WLX plugin interface using QuickLook QLPreviewView
+// Simple preview item
+@interface SimpleQLItem : NSObject <QLPreviewItem>
+@property NSURL *url;
+@end
 
-void* ListLoad(void* hwndParent, int showFlags, char* fileToLoad, struct ListDefaultParamStruct* lps) {
+@implementation SimpleQLItem
+- (NSURL *)previewItemURL {
+    return self.url;
+}
+@end
+
+// Load plugin
+void* ListLoad(void* hwndParent, int showFlags, char* fileToLoad, void* lps) {
     @autoreleasepool {
-        // Create QLPreviewView
-        NSRect frame = NSMakeRect(0, 0, 640, 480);
-        QLPreviewView *previewView = [[QLPreviewView alloc] initWithFrame:frame style:QLPreviewViewStyleNormal];
-        [previewView setAutostarts:YES];
+        if (!fileToLoad) return nullptr;
 
-        if (fileToLoad) {
-            NSURL *url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:fileToLoad]];
-            [previewView setPreviewItem:(id<QLPreviewItem>)url];
-        }
+        NSView *parent = (__bridge NSView *)hwndParent;
+        NSRect frame = NSMakeRect(0, 0, 640, 360);
 
-        // Add to parent view
-        if (hwndParent) {
-            NSView *parent = (__bridge NSView *)hwndParent;
-            [parent addSubview:previewView];
-        }
+        QLPreviewView *preview = [[QLPreviewView alloc] initWithFrame:frame style:QLPreviewViewStyleNormal];
+        preview.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
 
-        return (__bridge_retained void *)previewView;
+        SimpleQLItem *item = [SimpleQLItem new];
+        item.url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:fileToLoad]];
+        [preview setPreviewItem:item];
+
+        [parent addSubview:preview];
+        return (__bridge_retained void *)preview;
     }
 }
 
-int ListLoadNext(void* parentWin, void* pluginWin, const char* fileToLoad, int showFlags) {
+// Load next file
+int ListLoadNext(void* parentWin, void* pluginWin, char* fileToLoad, int showFlags) {
     @autoreleasepool {
-        if (!fileToLoad || !pluginWin) return LISTPLUGIN_ERROR;
+        if (!fileToLoad || !pluginWin) return 1;
 
-        NSURL *url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:fileToLoad]];
-        QLPreviewView *previewView = (__bridge QLPreviewView *)pluginWin;
-        [previewView setPreviewItem:(id<QLPreviewItem>)url];
-        return LISTPLUGIN_OK;
+        QLPreviewView *preview = (__bridge QLPreviewView *)pluginWin;
+        SimpleQLItem *item = [SimpleQLItem new];
+        item.url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:fileToLoad]];
+        [preview setPreviewItem:item];
+
+        return 0;
     }
 }
 
-void ListCloseWindow(void* listWin) {
+// Cleanup
+void ListCloseWindow(void* pluginWin) {
     @autoreleasepool {
-        if (listWin) {
-            QLPreviewView *previewView = (__bridge_transfer QLPreviewView *)listWin;
-            [previewView removeFromSuperview];
-        }
+        QLPreviewView *preview = (__bridge_transfer QLPreviewView *)pluginWin;
+        [preview removeFromSuperview];
     }
 }
 
-int ListGetDetectString(char *DetectString, int maxlen) {
-    snprintf(DetectString, maxlen, "EXT=\"PDF\"|EXT=\"TXT\"|EXT=\"PNG\"|EXT=\"JPG\"");
-    return 0;
+// Set detection string
+void ListGetDetectString(char* detectString, int maxlen) {
+    snprintf(detectString, maxlen, "EXT=\"PDF\"|EXT=\"JPG\"|EXT=\"PNG\"|EXT=\"TXT\"");
 }
 
 }
