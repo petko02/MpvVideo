@@ -1,4 +1,4 @@
-name: Build WLX Plugin (MpvVideo)
+name: Build MacPreview-Style WLX Plugin
 
 on:
   push:
@@ -13,30 +13,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up build environment
+      - name: Set up fat binary build (x86_64 + arm64)
         run: |
           mkdir -p MpvVideo.wlx
 
           export CFLAGS="-arch arm64 -arch x86_64"
-          export LDFLAGS="-arch arm64 -arch x86_64 -L. -lmpv"
+          export LDFLAGS="-arch arm64 -arch x86_64"
 
           clang++ -ObjC++ -Wall -O2 -fPIC -fobjc-arc -DGL_SILENCE_DEPRECATION \
             $CFLAGS \
-            -I. -Impv \
             -framework Cocoa \
-            -framework QuartzCore \
-            -framework OpenGL \
-            -framework QuickLookUI \
+            -framework Quartz \
+            -framework QuickLook \
             mpvvideo.mm \
             -dynamiclib -o MpvVideo.wlx/MpvVideo.wlx \
             $LDFLAGS
 
-      - name: Package plugin
+      - name: Zip the plugin
         run: |
-          zip -r MpvVideo.zip MpvVideo.wlx
+          zip -r MpvVideo.wlx.zip MpvVideo.wlx
 
-      - name: Upload plugin ZIP
+      - name: Upload result
         uses: actions/upload-artifact@v4
         with:
-          name: MpvVideo
-          path: MpvVideo.zip
+          name: MpvVideo.wlx
+          path: MpvVideo.wlx.zip
