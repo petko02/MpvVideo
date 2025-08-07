@@ -1,6 +1,9 @@
 #import <Cocoa/Cocoa.h>
 #import <Quartz/Quartz.h>
 
+#define LISTPLUGIN_OK 0
+#define LISTPLUGIN_ERROR 1
+
 extern "C" {
 
 // Simple WLX plugin interface using QuickLook QLPreviewView
