@@ -90,7 +90,8 @@ int (*mpv_opengl_cb_draw_fn)(mpv_opengl_cb_context *, int, int, int) = NULL;
 
 void on_mpv_update(void *ctx) {
     dispatch_async(dispatch_get_main_queue(), ^{
-        [(MpvGLView *)__bridge MpvGLView * ctx drawView];
+        MpvGLView *view = (__bridge MpvGLView *)ctx;
+        [view drawView];
     });
 }
 
