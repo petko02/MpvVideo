@@ -12,8 +12,10 @@ const
 type
   HWND = Pointer;
 
-function CreateMpvNSViewWithPath(path: PChar; frame: NSRect): NSView; cdecl;
-  external 'libMpvPlayerView.dylib' name 'CreateMpvNSViewWithPath' delayed;
+type
+  TCreateMpvNSView = function(frame: NSRect): NSView; cdecl;
+var
+  CreateMpvNSView: TCreateMpvNSView;
 
 function ListLoad(ParentWin: HWND; FileToLoad: PChar; ShowFlags: Integer): HWND; cdecl;
 var
