@@ -18,11 +18,14 @@ var
   CreateMpvNSView: TCreateMpvNSView;
 
 function ListLoad(ParentWin: HWND; FileToLoad: PChar; ShowFlags: Integer): HWND; cdecl;
+type
+  TCreateMpvNSView = function(frame: NSRect): NSView; cdecl;
 var
+  CreateMpvNSView: TCreateMpvNSView;
+  libHandle: TLibHandle;
   contentView: NSView;
   frame: NSRect;
   playerView: NSView;
-  libHandle: TLibHandle;
 begin
   if ParentWin = nil then
   begin
@@ -30,7 +33,6 @@ begin
     Exit;
   end;
 
-  // Load the dynamic library
   libHandle := LoadLibrary('libMpvPlayerView.dylib');
   if libHandle = 0 then
   begin
@@ -39,7 +41,6 @@ begin
     Exit;
   end;
 
-  // Resolve the symbol
   Pointer(CreateMpvNSView) := GetProcAddress(libHandle, 'CreateMpvNSView');
   if not Assigned(CreateMpvNSView) then
   begin
@@ -48,24 +49,11 @@ begin
     Exit;
   end;
 
-  // Get the container view from Double Commander
   contentView := NSView(ParentWin);
   frame := NSMakeRect(0, 0, contentView.frame.size.width, contentView.frame.size.height);
 
-  // Create and embed the video player view
   playerView := CreateMpvNSView(frame);
   if playerView <> nil then
-    contentView.addSubview(playerView);
-
-  Result := ParentWin;
-end;
-
-
-  contentView := NSView(ParentWin); // Cast pointer to NSView
-  frame := NSMakeRect(0, 0, contentView.frame.size.width, contentView.frame.size.height);
-
-  playerView := CreateMpvNSView(frame);
-  if Assigned(playerView) then
     contentView.addSubview(playerView);
 
   Result := ParentWin;
