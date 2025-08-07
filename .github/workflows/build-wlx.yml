@@ -10,17 +10,13 @@ jobs:
     runs-on: macos-13
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install dependencies
-        run: |
-          brew install coreutils
-
-      - name: Create output directory
+      - name: Prepare Output Directory
         run: mkdir -p MpvVideo.wlx
 
-      - name: Build WLX Plugin (Universal)
+      - name: Build Universal WLX Plugin
         run: |
           export CFLAGS="-arch arm64 -arch x86_64"
           export LDFLAGS="-arch arm64 -arch x86_64"
@@ -30,13 +26,9 @@ jobs:
             -framework Cocoa \
             -framework QuartzCore \
             -framework AppKit \
-            -framework QuickLook \
             mpvvideo.mm \
             -dynamiclib -o MpvVideo.wlx/MpvVideo.wlx \
             $LDFLAGS
 
-      - name: Upload plugin
-        uses: actions/upload-artifact@v4
-        with:
-          name: MpvVideo.wlx
-          path: MpvVideo.wlx/MpvVideo.wlx
+      - name: List Output
+        run: ls -l MpvVideo.wlx/
