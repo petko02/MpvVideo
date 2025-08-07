@@ -2,13 +2,11 @@
 #import <QuartzCore/QuartzCore.h>
 #import <OpenGL/gl3.h>
 #import "mpv/client.h"
-#import "mpv/opengl_cb.h"
+#import <dlfcn.h>
 
-// Patch for missing sub API constant and function declaration
-#ifndef MPV_SUB_API_OPENGL_CB
 #define MPV_SUB_API_OPENGL_CB 1
-extern void *mpv_get_sub_api(mpv_handle *ctx, int sub_api);
-#endif
+
+typedef struct mpv_opengl_cb_context mpv_opengl_cb_context;
 
 @interface MpvGLView : NSOpenGLView {
     mpv_handle *mpv;
@@ -18,12 +16,32 @@ extern void *mpv_get_sub_api(mpv_handle *ctx, int sub_api);
     NSButton *playPauseButton;
     BOOL isPlaying;
 }
-
 - (mpv_handle *)getMPV;
-
 @end
 
 @implementation MpvGLView
+
+// Manual function pointers
+void *(*mpv_get_sub_api_fn)(mpv_handle *, int) = NULL;
+int (*mpv_opengl_cb_init_gl_fn)(mpv_opengl_cb_context *, void *, void *, void *) = NULL;
+void (*mpv_opengl_cb_uninit_gl_fn)(mpv_opengl_cb_context *) = NULL;
+void (*mpv_opengl_cb_set_update_callback_fn)(mpv_opengl_cb_context *, void (*)(void *), void *) = NULL;
+int (*mpv_opengl_cb_draw_fn)(mpv_opengl_cb_context *, int, int, int) = NULL;
+
++ (void)initialize {
+    void *handle = dlopen(NULL, RTLD_LAZY | RTLD_LOCAL);
+    if (handle) {
+        mpv_get_sub_api_fn = dlsym(handle, "mpv_get_sub_api");
+        mpv_opengl_cb_init_gl_fn = dlsym(handle, "mpv_opengl_cb_init_gl");
+        mpv_opengl_cb_uninit_gl_fn = dlsym(handle, "mpv_opengl_cb_uninit_gl");
+        mpv_opengl_cb_set_update_callback_fn = dlsym(handle, "mpv_opengl_cb_set_update_callback");
+        mpv_opengl_cb_draw_fn = dlsym(handle, "mpv_opengl_cb_draw");
+    }
+}
+
+- (mpv_handle *)getMPV {
+    return mpv;
+}
 
 - (instancetype)initWithFrame:(NSRect)frame {
     NSOpenGLPixelFormatAttribute attrs[] = {
@@ -42,25 +60,19 @@ extern void *mpv_get_sub_api(mpv_handle *ctx, int sub_api);
     isPlaying = YES;
 
     mpv = mpv_create();
-    if (!mpv) {
-        NSLog(@"Failed to create mpv instance");
-        return nil;
-    }
+    if (!mpv) return nil;
 
     mpv_initialize(mpv);
     mpv_set_option_string(mpv, "terminal", "no");
 
-    // Get OpenGL sub API
-    mpv_gl = (mpv_opengl_cb_context *)mpv_get_sub_api(mpv, MPV_SUB_API_OPENGL_CB);
-    if (!mpv_gl) {
-        NSLog(@"Failed to get mpv OpenGL CB context");
-        return nil;
-    }
+    if (!mpv_get_sub_api_fn) return nil;
+
+    mpv_gl = (mpv_opengl_cb_context *)mpv_get_sub_api_fn(mpv, MPV_SUB_API_OPENGL_CB);
+    if (!mpv_gl) return nil;
 
     [self.openGLContext makeCurrentContext];
-    mpv_opengl_cb_init_gl(mpv_gl, NULL, NULL, NULL);
-
-    mpv_opengl_cb_set_update_callback(mpv_gl, &on_mpv_update, (__bridge void *)self);
+    mpv_opengl_cb_init_gl_fn(mpv_gl, NULL, NULL, NULL);
+    mpv_opengl_cb_set_update_callback_fn(mpv_gl, &on_mpv_update, (__bridge void *)self);
 
     const char *cmd[] = {"loadfile", "preview.mp4", NULL};
     mpv_command(mpv, cmd);
@@ -78,7 +90,7 @@ extern void *mpv_get_sub_api(mpv_handle *ctx, int sub_api);
 
 void on_mpv_update(void *ctx) {
     dispatch_async(dispatch_get_main_queue(), ^{
-        [(MpvGLView *)CFBridgingRelease(ctx) drawView];
+        [(MpvGLView *)ctx drawView];
     });
 }
 
@@ -108,9 +120,8 @@ void on_mpv_update(void *ctx) {
 
 - (void)drawView {
     [self.openGLContext makeCurrentContext];
-
     NSRect b = [self bounds];
-    mpv_opengl_cb_draw(mpv_gl, 0, (int)b.size.width, (int)b.size.height);
+    mpv_opengl_cb_draw_fn(mpv_gl, 0, (int)b.size.width, (int)b.size.height);
     glFlush();
     [self.openGLContext flushBuffer];
 }
@@ -122,7 +133,7 @@ void on_mpv_update(void *ctx) {
     }
 
     if (mpv_gl)
-        mpv_opengl_cb_uninit_gl(mpv_gl);
+        mpv_opengl_cb_uninit_gl_fn(mpv_gl);
     if (mpv)
         mpv_terminate_destroy(mpv);
 }
@@ -137,12 +148,10 @@ void* ListLoad(void* hwndParent, int fFlags, const char* filename, const void* f
     @autoreleasepool {
         NSRect frame = NSMakeRect(0, 0, 640, 360);
         MpvGLView *view = [[MpvGLView alloc] initWithFrame:frame];
-
         if (filename) {
             const char *cmd[] = {"loadfile", filename, NULL};
             mpv_command([view getMPV], cmd);
         }
-
         return (__bridge_retained void *)view;
     }
 }
@@ -152,21 +161,10 @@ int ListGetDetectString(char *DetectString, int maxlen) {
     return 0;
 }
 
-int ListLoadNext(void* listWin, const char* filename, int showFlags) {
-    return 0;
-}
-
-int ListSearchText(void* listWin, const char* searchString, int searchParameter) {
-    return 0;
-}
-
-int ListSearchDialog(void* listWin, int findNext) {
-    return 0;
-}
-
-int ListSendCommand(void* listWin, int command, int parameter) {
-    return 0;
-}
+int ListLoadNext(void* listWin, const char* filename, int showFlags) { return 0; }
+int ListSearchText(void* listWin, const char* searchString, int searchParameter) { return 0; }
+int ListSearchDialog(void* listWin, int findNext) { return 0; }
+int ListSendCommand(void* listWin, int command, int parameter) { return 0; }
 
 void ListCloseWindow(void* listWin) {
     @autoreleasepool {
@@ -174,5 +172,4 @@ void ListCloseWindow(void* listWin) {
         [view removeFromSuperview];
     }
 }
-
 }
