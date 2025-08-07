@@ -1,4 +1,4 @@
-name: Build WLX Plugin
+name: Build WLX Plugin for macOS
 
 on:
   push:
@@ -10,13 +10,13 @@ jobs:
     runs-on: macos-13
 
     steps:
-      - name: Checkout code
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Create output folder
+      - name: Create plugin folder
         run: mkdir -p MpvVideo.wlx
 
-      - name: Compile WLX plugin (AVKit, fat binary)
+      - name: Compile WLX plugin (universal binary)
         run: |
           export CFLAGS="-arch arm64 -arch x86_64"
           export LDFLAGS="-arch arm64 -arch x86_64"
@@ -29,7 +29,7 @@ jobs:
             -dynamiclib -o MpvVideo.wlx/MpvVideo.wlx \
             $LDFLAGS
 
-      - name: Upload plugin artifact
+      - name: Upload Plugin
         uses: actions/upload-artifact@v4
         with:
           name: MpvVideoPlugin
