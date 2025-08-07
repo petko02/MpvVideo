@@ -2,118 +2,64 @@
 #import <QuartzCore/QuartzCore.h>
 #import <OpenGL/gl3.h>
 #import <dlfcn.h>
-#import "mpv/client.h"
+#include <string.h>
 
-// Define WLX return codes
-#define LISTPLUGIN_OK      0
-#define LISTPLUGIN_ERROR   1
+#define LISTPLUGIN_OK 0
+#define LISTPLUGIN_ERROR 1
 
-@interface MpvGLView : NSOpenGLView {
-    mpv_handle *mpv;
-    mpv_opengl_cb_context *mpv_gl;
-    NSTimer *renderTimer;
-    NSButton *playPauseButton;
-    BOOL isPlaying;
+typedef void* (__cdecl *mpv_client_api_func)(const char *name);
+
+typedef struct mpv_handle mpv_handle;
+typedef struct mpv_render_context mpv_render_context;
+
+typedef int mpv_opengl_cb_get_proc_address_fn(void *ctx, const char *name);
+typedef struct mpv_opengl_cb_context mpv_opengl_cb_context;
+
+typedef mpv_render_context* (*mpv_get_sub_api_fn)(void *);
+typedef int (*mpv_render_context_set_update_callback_fn)(mpv_render_context*, void(*cb)(void*), void*);
+typedef int (*mpv_render_context_update_fn)(mpv_render_context*);
+typedef int (*mpv_render_context_render_fn)(mpv_render_context*, void*);
+
+mpv_get_sub_api_fn mpv_get_sub_api;
+mpv_render_context_set_update_callback_fn mpv_render_context_set_update_callback;
+mpv_render_context_update_fn mpv_render_context_update;
+mpv_render_context_render_fn mpv_render_context_render;
+
+@interface MPVView : NSOpenGLView {
+  mpv_render_context *mpv_ctx;
 }
 @end
 
-@implementation MpvGLView
+@implementation MPVView
 
-- (instancetype)initWithFrame:(NSRect)frame file:(NSString *)filepath {
-    NSOpenGLPixelFormatAttribute attrs[] = {
-        NSOpenGLPFAAccelerated,
-        NSOpenGLPFAColorSize, 24,
-        NSOpenGLPFADepthSize, 16,
-        NSOpenGLPFADoubleBuffer,
-        NSOpenGLPFAOpenGLProfile,
-        NSOpenGLProfileVersion3_2Core,
-        0
-    };
-    NSOpenGLPixelFormat *fmt = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
-    self = [super initWithFrame:frame pixelFormat:fmt];
-    if (!self) return nil;
-
-    isPlaying = YES;
-    mpv = mpv_create();
-    if (!mpv) return nil;
-
-    mpv_initialize(mpv);
-    const char *args[] = {"loadfile", filepath.UTF8String, NULL};
-    mpv_command(mpv, args);
-
-    playPauseButton = [[NSButton alloc] initWithFrame:NSMakeRect(10, 10, 60, 30)];
-    playPauseButton.title = @"⏸";
-    playPauseButton.target = self;
-    playPauseButton.action = @selector(togglePlayPause);
-    [self addSubview:playPauseButton];
-
-    renderTimer = [NSTimer scheduledTimerWithTimeInterval:1.0/30
-                                                   target:self
-                                                 selector:@selector(drawView)
-                                                 userInfo:nil
-                                                  repeats:YES];
-    return self;
-}
-
-- (void)togglePlayPause {
-    isPlaying = !isPlaying;
-    const char *cmd[] = {"cycle", "pause", NULL};
-    mpv_command(mpv, cmd);
-    playPauseButton.title = isPlaying ? @"⏸" : @"▶️";
-}
-
-- (void)drawView {
-    [self.openGLContext makeCurrentContext];
-    mpv_render_context_render(mpv_opengl_cb_context *ctx, 0, 0, self.bounds.size.width, self.bounds.size.height);
-    [self.openGLContext flushBuffer];
-}
-
-- (void)dealloc {
-    [renderTimer invalidate];
-    if (mpv) mpv_terminate_destroy(mpv);
-    [super dealloc];
+- (void)drawRect:(NSRect)dirtyRect {
+  if (mpv_ctx && mpv_render_context_render) {
+    mpv_render_context_render(mpv_ctx, NULL);
+  }
 }
 
 @end
 
-extern "C" {
+extern "C" int ListLoadW(const wchar_t* fileToLoad, int showFlags) {
+  NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 
-// Structure passed from Double Commander
-struct ListDefaultParamStruct {
-    int size;
-    struct { int cx; int cy; } size_struct;
-};
+  NSRect frame = NSMakeRect(0, 0, 800, 600);
+  NSWindow *window = [[NSWindow alloc] initWithContentRect:frame
+                                                 styleMask:(NSWindowStyleMaskTitled |
+                                                            NSWindowStyleMaskClosable |
+                                                            NSWindowStyleMaskResizable)
+                                                   backing:NSBackingStoreBuffered
+                                                     defer:NO];
+  [window setTitle:@"MpvVideo.wlx"];
+  [window makeKeyAndOrderFront:nil];
 
-void* ListLoad(void* hwndParent, int showFlags, char* fileToLoad, struct ListDefaultParamStruct* lps) {
-    @autoreleasepool {
-        if (!fileToLoad || !hwndParent) return nullptr;
+  MPVView *view = [[MPVView alloc] initWithFrame:frame];
+  [window setContentView:view];
 
-        NSView *parent = (__bridge NSView *)hwndParent;
-        NSRect frame = NSMakeRect(0, 0,
-            lps ? lps->size_struct.cx : 640,
-            lps ? lps->size_struct.cy : 360);
-
-        MpvGLView *view = [[MpvGLView alloc] initWithFrame:frame file:[NSString stringWithUTF8String:fileToLoad]];
-        if (!view) return nullptr;
-
-        [parent addSubview:view];
-        return (__bridge_retained void *)view;
-    }
+  [pool drain];
+  return LISTPLUGIN_OK;
 }
 
-int ListLoadNext(void* parentWin, void* pluginWin, char* fileToLoad, int showFlags) {
-    return LISTPLUGIN_OK;
-}
-
-void ListCloseWindow(void* pluginWin) {
-    @autoreleasepool {
-        NSView *view = (__bridge_transfer NSView *)pluginWin;
-        [view removeFromSuperview];
-    }
-}
-
-void ListGetDetectString(char* detectString, int maxlen) {
-    snprintf(detectString, maxlen, "EXT=\"MP4\"|EXT=\"MKV\"|EXT=\"AVI\"|EXT=\"MOV\"");
-}
-
+extern "C" void ListGetDetectString(char* DetectString, int maxlen) {
+  snprintf(DetectString, maxlen, "EXT=\"MP4\"|EXT=\"MKV\"|EXT=\"AVI\"|EXT=\"MOV\"|EXT=\"WMV\"");
 }
