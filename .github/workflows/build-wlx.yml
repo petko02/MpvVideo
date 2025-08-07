@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-13
+    runs-on: macos-latest
 
     steps:
       - name: Checkout repository
@@ -15,21 +15,21 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew update
-          brew install mpv pkg-config coreutils
+          brew install mpv pkg-config
 
-      - name: Download headers
+      - name: Download mpv headers
         run: |
           mkdir -p mpv
           curl -L -o mpv/opengl_cb.h https://raw.githubusercontent.com/Ivshti/libmpv/master/include/mpv/opengl_cb.h
           curl -L -o mpv/client.h https://raw.githubusercontent.com/mpv-player/mpv/v0.40.0/include/mpv/client.h
 
-      - name: Build plugin
+      - name: Compile plugin (ARC + OpenGL)
         run: |
           export PKG_CONFIG_PATH="$(brew --prefix mpv)/lib/pkgconfig:${PKG_CONFIG_PATH}"
           CFLAGS="$(pkg-config --cflags mpv)"
           LDFLAGS="$(pkg-config --libs mpv)"
           clang++ -ObjC++ -Wall -O2 -fPIC -DGL_SILENCE_DEPRECATION \
+            -fobjc-arc \
             $CFLAGS \
             -I. -Impv \
             -framework Cocoa \
@@ -39,11 +39,11 @@ jobs:
             -dynamiclib -o MpvVideo.wlx/libmpvvideo.dylib \
             $LDFLAGS
 
-      - name: Package
+      - name: Package plugin
         run: |
           mkdir -p release/MpvVideo
           cp MpvVideo.wlx/libmpvvideo.dylib release/MpvVideo/
-          cp *.h mpvvideo.mm release/MpvVideo/ || true
+          cp README.md mpvvideo.mm mpv/*.h release/MpvVideo/ || true
           cd release && zip -r MpvVideo.zip MpvVideo
 
       - name: Upload artifact
