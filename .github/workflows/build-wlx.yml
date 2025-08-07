@@ -15,30 +15,18 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install fpc coreutils curl unzip mpv
+          brew install fpc coreutils curl unzip
+          brew uninstall --ignore-dependencies mpv || true
 
-      - name: Compile for x86_64
+      - name: Prepare build directories
         run: |
-          export ARCH=x86_64
-          export CFLAGS="$(pkg-config --cflags mpv) -arch $ARCH"
-          export LDFLAGS="$(pkg-config --libs mpv) -arch $ARCH"
-          mkdir -p build/x86_64
-          clang++ -ObjC++ -Wall -O2 -fPIC -fobjc-arc -DGL_SILENCE_DEPRECATION \
-            $CFLAGS \
-            -I. -Impv \
-            -framework Cocoa \
-            -framework QuartzCore \
-            -framework OpenGL \
-            mpvvideo.mm \
-            -dynamiclib -o build/x86_64/MpvVideo.wlx \
-            $LDFLAGS
+          mkdir -p build/arm64 build/x86_64 MpvVideo.wlx
 
       - name: Compile for arm64
         run: |
           export ARCH=arm64
-          export CFLAGS="$(pkg-config --cflags mpv) -arch $ARCH"
-          export LDFLAGS="$(pkg-config --libs mpv) -arch $ARCH"
-          mkdir -p build/arm64
+          export CFLAGS="-arch $ARCH"
+          export LDFLAGS="-arch $ARCH ./libmpv.dylib"
           clang++ -ObjC++ -Wall -O2 -fPIC -fobjc-arc -DGL_SILENCE_DEPRECATION \
             $CFLAGS \
             -I. -Impv \
@@ -49,19 +37,39 @@ jobs:
             -dynamiclib -o build/arm64/MpvVideo.wlx \
             $LDFLAGS
 
-      - name: Create universal fat plugin
+      - name: Compile for x86_64
         run: |
-          mkdir -p MpvVideo.wlx
-          lipo -create -output MpvVideo.wlx/MpvVideo.wlx \
-            build/x86_64/MpvVideo.wlx build/arm64/MpvVideo.wlx
-          file MpvVideo.wlx/MpvVideo.wlx
+          export ARCH=x86_64
+          export CFLAGS="-arch $ARCH"
+          export LDFLAGS="-arch $ARCH ./libmpv.dylib"
+          clang++ -ObjC++ -Wall -O2 -fPIC -fobjc-arc -DGL_SILENCE_DEPRECATION \
+            $CFLAGS \
+            -I. -Impv \
+            -framework Cocoa \
+            -framework QuartzCore \
+            -framework OpenGL \
+            mpvvideo.mm \
+            -dynamiclib -o build/x86_64/MpvVideo.wlx \
+            $LDFLAGS
 
-      - name: Zip plugin
+      - name: Merge into fat binary
         run: |
-          zip -r MpvVideo.zip MpvVideo.wlx
+          lipo -create -output MpvVideo.wlx/MpvVideo.wlx \
+            build/arm64/MpvVideo.wlx build/x86_64/MpvVideo.wlx
+          lipo -info MpvVideo.wlx/MpvVideo.wlx
+
+      - name: Copy required dylibs
+        run: |
+          cp libmpv.dylib MpvVideo.wlx/
+          cp libmpv.2.dylib MpvVideo.wlx/
+
+      - name: Zip plugin for release
+        run: |
+          cd MpvVideo.wlx
+          zip -r ../MpvVideo-wlx-macOS.zip .
 
       - name: Upload plugin zip
         uses: actions/upload-artifact@v4
         with:
-          name: MpvVideo
-          path: MpvVideo.zip
+          name: MpvVideo-wlx-macOS
+          path: MpvVideo-wlx-macOS.zip
