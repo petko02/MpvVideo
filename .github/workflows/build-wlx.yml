@@ -40,7 +40,7 @@ jobs:
             $LDFLAGS
 
       - name: Upload WLX plugin artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: MpvVideo.wlx
           path: MpvVideo.wlx/
