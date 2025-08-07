@@ -167,7 +167,7 @@ extern "C" void* ListLoad(void* hwndParent, int showFlags, char* fileToLoad, str
 }
 
 extern "C" int ListGetDetectString(char *DetectString, int maxlen) {
-    snprintf(DetectString, maxlen, "EXT="MP4"|EXT="MKV"|EXT="AVI"|EXT="MOV"|EXT="WMV"");
+    snprintf(DetectString, maxlen, "EXT=\"MP4\"|EXT=\"MKV\"|EXT=\"AVI\"|EXT=\"MOV\"|EXT=\"WMV\"");
     return 0;
 }
 
