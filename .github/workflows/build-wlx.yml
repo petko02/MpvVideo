@@ -1,4 +1,4 @@
-name: Build Fat WLX Plugin (MpvVideo)
+name: Build WLX Plugin (MpvVideo)
 
 on:
   push:
@@ -10,34 +10,35 @@ jobs:
     runs-on: macos-13
 
     steps:
-      - name: Checkout repository
+      - name: Checkout source
         uses: actions/checkout@v3
 
       - name: Set up build environment
         run: |
-          brew install clang coreutils
+          brew install coreutils
 
-      - name: Build MpvVideo.wlx (fat binary)
+      - name: Compile universal WLX plugin
         run: |
           mkdir -p MpvVideo.wlx
+          
           export CFLAGS="-arch arm64 -arch x86_64"
           export LDFLAGS="-arch arm64 -arch x86_64 -L. -lmpv"
-          
+
           clang++ -ObjC++ -Wall -O2 -fPIC -fobjc-arc -DGL_SILENCE_DEPRECATION \
             $CFLAGS \
             -I. -Impv \
             -framework Cocoa \
             -framework QuartzCore \
             -framework OpenGL \
-            -framework QuickLookUI \
             mpvvideo.mm \
             -dynamiclib -o MpvVideo.wlx/MpvVideo.wlx \
             $LDFLAGS
 
-      - name: Zip output plugin
-        run: zip -r MpvVideo.zip MpvVideo.wlx
+      - name: Zip plugin
+        run: |
+          zip -r MpvVideo.zip MpvVideo.wlx
 
-      - name: Upload artifact
+      - name: Upload plugin
         uses: actions/upload-artifact@v4
         with:
           name: MpvVideoPlugin
