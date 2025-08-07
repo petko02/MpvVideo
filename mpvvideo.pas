@@ -4,26 +4,36 @@ library MpvVideo;
 {$modeswitch objectivec1}
 
 uses
-  CocoaAll, MacOSAll, Classes, SysUtils, DynLibs;
+  CocoaAll, MacOSAll, Classes, SysUtils;
 
 const
-  WLX_VERSION = 1;
   LISTPLUGIN_OK = 0;
 
 type
-  TListDefaultParamStruct = record
-    size: Integer;
-    InterfaceVersionLow: Integer;
-    InterfaceVersionHigh: Integer;
-    DefaultIniName: PChar;
-  end;
+  HWND = Pointer;
 
-  HWND = Pointer; // Just for compatibility; WLX doesn't need a real HWND
+function CreateMpvNSView(frame: NSRect): NSView; cdecl; external 'libMpvPlayerView.dylib';
 
 function ListLoad(ParentWin: HWND; FileToLoad: PChar; ShowFlags: Integer): HWND; cdecl;
+var
+  contentView: NSView;
+  playerView: NSView;
+  frame: NSRect;
 begin
-  // Placeholder: We'll embed an NSView here with libmpv playback
-  Result := nil;
+  if ParentWin = nil then
+  begin
+    Result := nil;
+    Exit;
+  end;
+
+  contentView := NSView(ParentWin); // Cast pointer to NSView
+  frame := NSMakeRect(0, 0, contentView.frame.size.width, contentView.frame.size.height);
+
+  playerView := CreateMpvNSView(frame);
+  if Assigned(playerView) then
+    contentView.addSubview(playerView);
+
+  Result := ParentWin;
 end;
 
 function ListGetDetectString(DetectString: PChar; maxlen: Integer): Integer; cdecl;
