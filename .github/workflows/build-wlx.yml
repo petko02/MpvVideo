@@ -1,4 +1,4 @@
-name: Build WLX Plugin (MpvVideo)
+name: Build MpvVideo WLX Plugin (macOS arm64, Standalone)
 
 on:
   push:
@@ -15,24 +15,28 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install fpc coreutils curl unzip mpv
+          brew install fpc coreutils curl unzip
+          brew uninstall mpv || true
+          arch -arm64 brew install mpv --build-from-source
 
-      - name: Download mpv headers
+      - name: Validate libmpv architecture
         run: |
-          mkdir -p mpv
-          curl -L -o mpv/client.h https://raw.githubusercontent.com/mpv-player/mpv/v0.40.0/include/mpv/client.h
-          curl -L -o mpv/opengl_cb.h https://raw.githubusercontent.com/Ivshti/libmpv/master/include/mpv/opengl_cb.h
+          LIB_PATH="$(brew --prefix mpv)/lib/libmpv.2.dylib"
+          ARCH_INFO=$(lipo -archs "$LIB_PATH")
+          echo "libmpv.2.dylib architecture: $ARCH_INFO"
+          if [[ "$ARCH_INFO" != *"arm64"* ]]; then
+            echo "::error::libmpv is not compiled for arm64. Please reinstall with --build-from-source."
+            exit 1
+          fi
 
-      - name: Compile WLX plugin (Apple Silicon)
+      - name: Build MpvVideo.wlx (arm64)
         run: |
           export PKG_CONFIG_PATH="$(brew --prefix mpv)/lib/pkgconfig:${PKG_CONFIG_PATH}"
-          CFLAGS="$(pkg-config --cflags mpv)"
-          LDFLAGS="$(pkg-config --libs mpv)"
-
-          export CFLAGS="$CFLAGS -arch arm64"
-          export LDFLAGS="$LDFLAGS -arch arm64"
+          CFLAGS="$(pkg-config --cflags mpv) -arch arm64"
+          LDFLAGS="$(pkg-config --libs mpv) -arch arm64"
 
           mkdir -p MpvVideo.wlx
+
           clang++ -ObjC++ -Wall -O2 -fPIC -fobjc-arc -DGL_SILENCE_DEPRECATION \
             $CFLAGS \
             -I. -Impv \
@@ -43,20 +47,16 @@ jobs:
             -dynamiclib -o MpvVideo.wlx/MpvVideo.wlx \
             $LDFLAGS
 
-      - name: Copy libmpv.dylib (optional)
+      - name: Copy libmpv.2.dylib (for standalone)
         run: |
-          MPV_LIB=$(brew --prefix mpv)/lib/libmpv.dylib
-          if [ -f "$MPV_LIB" ]; then
-            cp "$MPV_LIB" MpvVideo.wlx/
-          fi
+          cp "$(brew --prefix mpv)/lib/libmpv.2.dylib" MpvVideo.wlx/
 
-      - name: Zip plugin for release
+      - name: Package Standalone Plugin
         run: |
-          cd MpvVideo.wlx
-          zip -r ../MpvVideo.zip .
+          zip -r MpvVideo_macOS_arm64_standalone.zip MpvVideo.wlx
 
-      - name: Upload zip artifact
+      - name: Upload ZIP Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MpvVideo.zip
-          path: MpvVideo.zip
+          name: MpvVideo_macOS_arm64_standalone
+          path: MpvVideo_macOS_arm64_standalone.zip
