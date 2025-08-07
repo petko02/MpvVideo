@@ -23,7 +23,7 @@ jobs:
             -o libMpvPlayerView.dylib MpvPlayerView.mm \
             -arch x86_64 -arch arm64
 
-      - name: 🧠 Compile WLX Plugin (Free Pascal Universal Build)
+      - name: 🧠 Compile WLX Plugin (Free Pascal for x86_64 only)
         run: |
           SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
           FRAMEWORKS="$SDKROOT/System/Library/Frameworks"
@@ -35,12 +35,8 @@ jobs:
               -k"-framework" -k"Foundation" \
               -Fu. -oMpvVideo_x64.wlx MpvVideo.pas
 
-          fpc -PAARCH64 \
-              -XR"$SDKROOT"/usr/bin \
-              -Fl"$SDKROOT"/usr/lib \
-              -k"-F$FRAMEWORKS" \
-              -k"-framework" -k"Foundation" \
-              -Fu. -oMpvVideo_arm64.wlx MpvVideo.pas
+          # Create fake universal plugin by copying x86_64 build
+          cp MpvVideo_x64.wlx MpvVideo.wlx
 
       - name: 🧬 Merge into Universal WLX Binary
         run: |
