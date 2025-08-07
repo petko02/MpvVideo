@@ -1,75 +1,90 @@
-name: Build Universal WLX Plugin (MpvVideo)
+name: Build Universal MpvVideo Plugin (macOS)
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      include_x86:
+        description: 'Build x86_64 libs and universal plugin'
+        required: true
+        default: true
 
 jobs:
-  build:
+  build_x86_libs:
+    if: ${{ github.event.inputs.include_x86 == 'true' }}
+    runs-on: macos-13
+    outputs:
+      lib_x86: ${{ steps.export.outputs.lib_path }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install dependencies for x86 build
+        run: |
+          brew install meson ninja pkg-config libx11
+          arch -x86_64 brew install mpv --build-from-source
+
+      - name: Find x86_64 libmpv paths
+        id: export
+        run: |
+          PREFIX=$(brew --prefix mpv)
+          echo "::set-output name=lib_path_x86::$PREFIX/lib/libmpv.dylib"
+          echo "::set-output name=lib2_path_x86::$PREFIX/lib/libmpv.2.dylib"
+
+      - name: Upload x86_64 libs
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpv-x86-libs
+          path: |
+            ${{ steps.export.outputs.lib_path_x86 }}
+            ${{ steps.export.outputs.lib2_path_x86 }}
+
+  build_universal_plugin:
+    needs: build_x86_libs
     runs-on: macos-13
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Install dependencies
-        run: |
-          brew install fpc coreutils curl unzip
-          brew uninstall --ignore-dependencies mpv || true
-
-      - name: Prepare build directories
-        run: |
-          mkdir -p build/arm64 build/x86_64 MpvVideo.wlx
-
-      - name: Compile for arm64
-        run: |
-          export ARCH=arm64
-          export CFLAGS="-arch $ARCH"
-          export LDFLAGS="-arch $ARCH ./libmpv.dylib"
-          clang++ -ObjC++ -Wall -O2 -fPIC -fobjc-arc -DGL_SILENCE_DEPRECATION \
-            $CFLAGS \
-            -I. -Impv \
-            -framework Cocoa \
-            -framework QuartzCore \
-            -framework OpenGL \
-            mpvvideo.mm \
-            -dynamiclib -o build/arm64/MpvVideo.wlx \
-            $LDFLAGS
-
-      - name: Compile for x86_64
-        run: |
-          export ARCH=x86_64
-          export CFLAGS="-arch $ARCH"
-          export LDFLAGS="-arch $ARCH ./libmpv.dylib"
-          clang++ -ObjC++ -Wall -O2 -fPIC -fobjc-arc -DGL_SILENCE_DEPRECATION \
-            $CFLAGS \
-            -I. -Impv \
-            -framework Cocoa \
-            -framework QuartzCore \
-            -framework OpenGL \
-            mpvvideo.mm \
-            -dynamiclib -o build/x86_64/MpvVideo.wlx \
-            $LDFLAGS
-
-      - name: Merge into fat binary
-        run: |
-          lipo -create -output MpvVideo.wlx/MpvVideo.wlx \
-            build/arm64/MpvVideo.wlx build/x86_64/MpvVideo.wlx
-          lipo -info MpvVideo.wlx/MpvVideo.wlx
-
-      - name: Copy required dylibs
-        run: |
-          cp libmpv.dylib MpvVideo.wlx/
-          cp libmpv.2.dylib MpvVideo.wlx/
-
-      - name: Zip plugin for release
-        run: |
-          cd MpvVideo.wlx
-          zip -r ../MpvVideo-wlx-macOS.zip .
-
-      - name: Upload plugin zip
-        uses: actions/upload-artifact@v4
+      - name: Download x86_64 libs
+        uses: actions/download-artifact@v4
         with:
-          name: MpvVideo-wlx-macOS
-          path: MpvVideo-wlx-macOS.zip
+          name: mpv-x86-libs
+          path: x86_libs/
+
+      - name: Prepare universal libmpv
+        run: |
+          cp x86_libs/libmpv.dylib libmpv.x86.dylib
+          cp x86_libs/libmpv.2.dylib libmpv.2.x86.dylib
+          cp libmpv.dylib libmpv.arm64.dylib
+          cp libmpv.2.dylib libmpv.2.arm64.dylib
+          lipo -create -output libmpv.dylib libmpv.arm64.dylib libmpv.x86.dylib
+          lipo -create -output libmpv.2.dylib libmpv.2.arm64.dylib libmpv.2.x86.dylib
+          lipo -info libmpv.dylib
+          lipo -info libmpv.2.dylib
+
+      - name: Build universal plugin
+        run: |
+          CFLAGS="-arch arm64 -arch x86_64"
+          LDFLAGS="-arch arm64 -arch x86_64 -L . -lmpv"
+          mkdir -p MpvVideo.wlx
+          clang++ -ObjC++ -Wall -O2 -fPIC -fobjc-arc -DGL_SILENCE_DEPRECATION \
+            $CFLAGS \
+            -I. -Impv \
+            -framework Cocoa \
+            -framework QuartzCore \
+            -framework OpenGL \
+            mpvvideo.mm \
+            -dynamiclib -o MpvVideo.wlx/MpvVideo.wlx \
+            $LDFLAGS
+
+      - name: Copy universal libs beside plugin
+        run: |
+          cp libmpv.dylib libmpv.2.dylib MpvVideo.wlx/
+
+      - name: Zip and upload final plugin
+        run: |
+          zip -r MpvVideo-macos-universal.zip MpvVideo.wlx
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MpvVideo-macos-universal
+          path: MpvVideo-macos-universal.zip
