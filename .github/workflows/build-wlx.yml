@@ -1,4 +1,4 @@
-name: Build WLX Plugin for macOS
+name: Build WLX Plugin (MpvVideo)
 
 on:
   push:
@@ -10,27 +10,47 @@ jobs:
     runs-on: macos-13
 
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v3
 
-      - name: Create plugin folder
-        run: mkdir -p MpvVideo.wlx
-
-      - name: Compile WLX plugin (universal binary)
+      - name: 🛠️ Install Dependencies
         run: |
-          export CFLAGS="-arch arm64 -arch x86_64"
-          export LDFLAGS="-arch arm64 -arch x86_64"
-          clang++ -ObjC++ -Wall -O2 -fobjc-arc -fPIC \
-            $CFLAGS \
-            -framework Cocoa \
-            -framework AVKit \
-            -framework AVFoundation \
-            mpvvideo.mm \
-            -dynamiclib -o MpvVideo.wlx/MpvVideo.wlx \
-            $LDFLAGS
+          brew install fpc coreutils unzip curl
 
-      - name: Upload Plugin
+      - name: 🧱 Compile Cocoa Wrapper (libMpvPlayerView.dylib)
+        run: |
+          clang++ -dynamiclib -fobjc-arc -framework Cocoa \
+            -o libMpvPlayerView.dylib MpvPlayerView.mm \
+            -arch x86_64 -arch arm64
+
+      - name: 🧠 Compile WLX Plugin (Free Pascal)
+        run: |
+          fpc -Px86_64 -XR/Library/Developer/CommandLineTools/usr/bin/ MpvVideo.pas -Fu. -oMpvVideo_x64.wlx
+          fpc -Parm64 -XR/Library/Developer/CommandLineTools/usr/bin/ MpvVideo.pas -Fu. -oMpvVideo_arm64.wlx
+
+      - name: 🧬 Merge into Universal WLX Plugin
+        run: |
+          lipo -create -output MpvVideo.wlx MpvVideo_x64.wlx MpvVideo_arm64.wlx
+          file MpvVideo.wlx
+          chmod +x MpvVideo.wlx
+
+      - name: 📦 Bundle plugin files
+        run: |
+          mkdir -p MpvVideo_Package
+          cp MpvVideo.wlx MpvVideo_Package/
+          cp libMpvPlayerView.dylib MpvVideo_Package/
+
+          # Optional: Include your existing libmpv.dylib (must be universal)
+          if [ -f libmpv.dylib ]; then
+            cp libmpv.dylib MpvVideo_Package/
+          fi
+
+      - name: 🗜️ Create ZIP archive
+        run: |
+          zip -r MpvVideo_macOS_Universal.zip MpvVideo_Package
+
+      - name: 📤 Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MpvVideoPlugin
-          path: MpvVideo.wlx/MpvVideo.wlx
+          name: MpvVideo_WLX_Plugin
+          path: MpvVideo_macOS_Universal.zip
