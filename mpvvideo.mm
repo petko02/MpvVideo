@@ -8,6 +8,20 @@
 
 typedef struct mpv_opengl_cb_context mpv_opengl_cb_context;
 
+// Fix: Provide complete definition for Double Commander struct
+struct SizeStruct {
+    int cx;
+    int cy;
+};
+
+struct ListDefaultParamStruct {
+    int dummy1;
+    int dummy2;
+    int dummy3;
+    char* dummy4;
+    SizeStruct size;
+};
+
 @interface MpvGLView : NSOpenGLView {
     mpv_handle *mpv;
     mpv_opengl_cb_context *mpv_gl;
@@ -142,16 +156,24 @@ void on_mpv_update(void *ctx) {
 
 extern "C" void* ListLoad(void* hwndParent, int showFlags, char* fileToLoad, struct ListDefaultParamStruct* lps) {
     @autoreleasepool {
-        NSRect frame = NSMakeRect(0, 0, lps ? lps->size.cx : 640, lps ? lps->size.cy : 360);
+        int width = 640;
+        int height = 360;
+        if (lps) {
+            width = lps->size.cx;
+            height = lps->size.cy;
+        }
+
+        NSRect frame = NSMakeRect(0, 0, width, height);
         MpvGLView *view = [[MpvGLView alloc] initWithFrame:frame];
-        if (fileToLoad && [[NSFileManager defaultManager] fileExistsAtPath:[NSString stringWithUTF8String:fileToLoad]]) {
+
+        if (fileToLoad) {
             const char *cmd[] = {"loadfile", fileToLoad, NULL};
             mpv_command([view getMPV], cmd);
         }
+
         return (__bridge_retained void *)view;
     }
 }
-
 
 int ListGetDetectString(char *DetectString, int maxlen) {
     snprintf(DetectString, maxlen, "EXT=\"MP4\"|EXT=\"MKV\"|EXT=\"AVI\"|EXT=\"MOV\"|EXT=\"WMV\"");
@@ -168,5 +190,4 @@ void ListCloseWindow(void* listWin) {
         NSView *view = (__bridge_transfer NSView *)listWin;
         [view removeFromSuperview];
     }
-}
 }
