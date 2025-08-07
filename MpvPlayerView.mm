@@ -57,7 +57,7 @@ typedef struct mpv_handle mpv_handle;
     self.mpv = mpv_create();
     mpv_initialize(self.mpv);
 
-    // 🔧 Temporary test video
+    // TEMPORARY test audio file (replace later with video file path)
     const char *cmd[] = {"loadfile", "/System/Library/Sounds/Funk.aiff", NULL};
     mpv_command(self.mpv, cmd);
 
@@ -102,7 +102,7 @@ typedef struct mpv_handle mpv_handle;
 
 @end
 
-// 🔗 Exposed to Pascal
+// Expose to Pascal
 extern "C" NSView *CreateMpvNSView(CGRect frame) {
     return [[MpvPlayerView alloc] initWithFrame:frame];
 }
