@@ -1,33 +1,41 @@
 // mpvvideo.mm
 #import <Cocoa/Cocoa.h>
+#import <AVKit/AVKit.h>
 #import "wlxplugin.h"
 
 NSView *previewView = nil;
+AVPlayerView *playerView = nil;
 
-void* DCPCALL ListLoad(HWND ParentWin, char* FileToLoad, int ShowFlags) {
-    @autoreleasepool {
-        NSString *path = [NSString stringWithUTF8String:FileToLoad];
-        NSURL *url = [NSURL fileURLWithPath:path];
-        NSView *parent = (__bridge NSView *)(ParentWin);
+int DCPCALL ListLoad(HWND ParentWin, char* FileToLoad, int ShowFlags)
+{
+    NSString *path = [NSString stringWithUTF8String:FileToLoad];
+    NSURL *url = [NSURL fileURLWithPath:path];
 
-        NSTextView *textView = [[NSTextView alloc] initWithFrame:parent.bounds];
-        textView.string = [NSString stringWithFormat:@"Preview: %@", [url lastPathComponent]];
-        textView.editable = NO;
-        textView.drawsBackground = NO;
-        textView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    NSView *parent = (__bridge NSView *)(ParentWin);
 
-        [parent addSubview:textView];
-        previewView = textView;
+    playerView = [[AVPlayerView alloc] initWithFrame:parent.bounds];
+    playerView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    playerView.controlsStyle = AVPlayerViewControlsStyleDefault;
+    playerView.player = [AVPlayer playerWithURL:url];
 
-        return (__bridge_retained void *)textView;
-    }
+    [parent addSubview:playerView];
+    previewView = playerView;
+
+    [playerView.player play];
+
+    return (int)(__bridge_retained void *)playerView;
 }
 
-void DCPCALL ListCloseWindow(void* ListWin) {
+void DCPCALL ListCloseWindow(HWND ListWin)
+{
     NSView *view = (__bridge_transfer NSView *)ListWin;
     [view removeFromSuperview];
+    previewView = nil;
+    playerView = nil;
 }
 
-void DCPCALL ListGetDetectString(char* DetectString, int maxlen) {
-    snprintf(DetectString, maxlen, "EXT=\"MP4\"|EXT=\"MKV\"|EXT=\"AVI\"|EXT=\"MOV\"|EXT=\"WMV\"");
+void DCPCALL ListGetDetectString(char* DetectString, int maxlen)
+{
+    snprintf(DetectString, maxlen,
+             "EXT=\"MP4\"|EXT=\"MKV\"|EXT=\"AVI\"|EXT=\"MOV\"|EXT=\"WMV\"");
 }
