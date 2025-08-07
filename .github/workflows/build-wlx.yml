@@ -26,17 +26,21 @@ jobs:
       - name: 🧠 Compile WLX Plugin (Free Pascal Universal Build)
         run: |
           SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
+          FRAMEWORKS="$SDKROOT/System/Library/Frameworks"
 
           fpc -Px86_64 \
               -XR"$SDKROOT"/usr/bin \
               -Fl"$SDKROOT"/usr/lib \
+              -k"-F$FRAMEWORKS" \
+              -k"-framework" -k"Foundation" \
               -Fu. -oMpvVideo_x64.wlx MpvVideo.pas
 
           fpc -Parm64 \
               -XR"$SDKROOT"/usr/bin \
               -Fl"$SDKROOT"/usr/lib \
+              -k"-F$FRAMEWORKS" \
+              -k"-framework" -k"Foundation" \
               -Fu. -oMpvVideo_arm64.wlx MpvVideo.pas
-
 
       - name: 🧬 Merge into Universal WLX Binary
         run: |
