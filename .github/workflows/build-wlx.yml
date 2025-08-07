@@ -35,12 +35,9 @@ jobs:
               -k"-framework" -k"Foundation" \
               -Fu. -oMpvVideo_x64.wlx MpvVideo.pas
 
-          # Create fake universal plugin by copying x86_64 build
-          cp MpvVideo_x64.wlx MpvVideo.wlx
-
-      - name: 🧬 Merge into Universal WLX Binary
+      - name: ✅ Use x86_64 build as final plugin
         run: |
-          lipo -create -output MpvVideo.wlx MpvVideo_x64.wlx MpvVideo_arm64.wlx
+          cp MpvVideo_x64.wlx MpvVideo.wlx
           file MpvVideo.wlx
           chmod +x MpvVideo.wlx
 
