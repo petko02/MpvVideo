@@ -14,22 +14,6 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install dependencies
-        run: |name: Build WLX Plugin (MpvVideo)
-
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: macos-13
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Install dependencies
         run: |
           brew update
           brew install mpv pkg-config coreutils
@@ -63,47 +47,6 @@ jobs:
           mkdir -p release/MpvVideo
           cp MpvVideo.wlx/libmpvvideo.dylib release/MpvVideo/
           cp mpvvideo.mm mpv/*.h README.md release/MpvVideo/ || true
-          cd release && zip -r MpvVideo.zip MpvVideo
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: MpvVideo
-          path: release/MpvVideo.zip
-
-          brew update
-          brew install mpv pkg-config
-
-      - name: Download mpv headers
-        run: |
-          mkdir -p mpv
-          curl -L -o mpv/opengl_cb.h https://raw.githubusercontent.com/Ivshti/libmpv/master/include/mpv/opengl_cb.h
-          curl -L -o mpv/client.h https://raw.githubusercontent.com/mpv-player/mpv/v0.40.0/include/mpv/client.h
-
-      - name: Prepare plugin directory
-        run: mkdir -p MpvVideo.wlx
-
-      - name: Compile Objective-C++ with ARC
-        run: |
-          export PKG_CONFIG_PATH="$(brew --prefix mpv)/lib/pkgconfig:${PKG_CONFIG_PATH}"
-          CFLAGS="$(pkg-config --cflags mpv)"
-          LDFLAGS="$(pkg-config --libs mpv)"
-          clang++ -ObjC++ -Wall -O2 -fPIC -fobjc-arc -DGL_SILENCE_DEPRECATION \
-            $CFLAGS \
-            -I. -Impv \
-            -framework Cocoa \
-            -framework QuartzCore \
-            -framework OpenGL \
-            mpvvideo.mm \
-            -dynamiclib -o MpvVideo.wlx/libmpvvideo.dylib \
-            $LDFLAGS
-
-      - name: Package for release
-        run: |
-          mkdir -p release/MpvVideo
-          cp MpvVideo.wlx/libmpvvideo.dylib release/MpvVideo/
-          cp mpvvideo.mm release/MpvVideo/
-          cp README.md release/MpvVideo/ || true
           cd release && zip -r MpvVideo.zip MpvVideo
 
       - name: Upload artifact
