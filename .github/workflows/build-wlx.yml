@@ -35,7 +35,7 @@ jobs:
               -k"-framework" -k"Foundation" \
               -Fu. -oMpvVideo_x64.wlx MpvVideo.pas
 
-          fpc -Parm64 \
+          fpc -PaAARCH64 \
               -XR"$SDKROOT"/usr/bin \
               -Fl"$SDKROOT"/usr/lib \
               -k"-F$FRAMEWORKS" \
