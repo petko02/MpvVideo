@@ -4,27 +4,9 @@
 #import <dlfcn.h>
 #import "mpv/client.h"
 
-// Manual declaration to avoid duplicate member error
-struct Size {
-    int cx;
-    int cy;
-};
-
-struct ListDefaultParamStruct {
-    int size;
-    struct Size size_struct;
-};
-
-// ========== OpenGL CB ==========
 #define MPV_SUB_API_OPENGL_CB 1
-typedef struct mpv_opengl_cb_context mpv_opengl_cb_context;
 
-// Function pointers
-void *(*mpv_get_sub_api_fn)(mpv_handle *, int) = NULL;
-int (*mpv_opengl_cb_init_gl_fn)(mpv_opengl_cb_context *, void *, void *, void *) = NULL;
-void (*mpv_opengl_cb_uninit_gl_fn)(mpv_opengl_cb_context *) = NULL;
-void (*mpv_opengl_cb_set_update_callback_fn)(mpv_opengl_cb_context *, void (*)(void *), void *) = NULL;
-int (*mpv_opengl_cb_draw_fn)(mpv_opengl_cb_context *, int, int, int) = NULL;
+typedef struct mpv_opengl_cb_context mpv_opengl_cb_context;
 
 @interface MpvGLView : NSOpenGLView {
     mpv_handle *mpv;
@@ -38,6 +20,13 @@ int (*mpv_opengl_cb_draw_fn)(mpv_opengl_cb_context *, int, int, int) = NULL;
 @end
 
 @implementation MpvGLView
+
+// Manual function pointers
+void *(*mpv_get_sub_api_fn)(mpv_handle *, int) = NULL;
+int (*mpv_opengl_cb_init_gl_fn)(mpv_opengl_cb_context *, void *, void *, void *) = NULL;
+void (*mpv_opengl_cb_uninit_gl_fn)(mpv_opengl_cb_context *) = NULL;
+void (*mpv_opengl_cb_set_update_callback_fn)(mpv_opengl_cb_context *, void (*)(void *), void *) = NULL;
+int (*mpv_opengl_cb_draw_fn)(mpv_opengl_cb_context *, int, int, int) = NULL;
 
 + (void)initialize {
     void *handle = dlopen(NULL, RTLD_LAZY | RTLD_LOCAL);
@@ -151,6 +140,14 @@ void on_mpv_update(void *ctx) {
 
 // === Double Commander Plugin Interface ===
 
+struct ListDefaultParamStruct {
+    int size;
+    struct {
+        int cx;
+        int cy;
+    } size_struct;
+};
+
 extern "C" void* ListLoad(void* hwndParent, int showFlags, char* fileToLoad, struct ListDefaultParamStruct* lps) {
     @autoreleasepool {
         NSRect frame = NSMakeRect(0, 0, lps ? lps->size_struct.cx : 640, lps ? lps->size_struct.cy : 360);
@@ -170,25 +167,14 @@ extern "C" void* ListLoad(void* hwndParent, int showFlags, char* fileToLoad, str
 }
 
 extern "C" int ListGetDetectString(char *DetectString, int maxlen) {
-    snprintf(DetectString, maxlen, "EXT=\"MP4\"|EXT=\"MKV\"|EXT=\"AVI\"|EXT=\"MOV\"|EXT=\"WMV\"");
+    snprintf(DetectString, maxlen, "EXT="MP4"|EXT="MKV"|EXT="AVI"|EXT="MOV"|EXT="WMV"");
     return 0;
 }
 
-extern "C" int ListLoadNext(void* listWin, const char* filename, int showFlags) {
-    return 0;
-}
-
-extern "C" int ListSearchText(void* listWin, const char* searchString, int searchParameter) {
-    return 0;
-}
-
-extern "C" int ListSearchDialog(void* listWin, int findNext) {
-    return 0;
-}
-
-extern "C" int ListSendCommand(void* listWin, int command, int parameter) {
-    return 0;
-}
+extern "C" int ListLoadNext(void* listWin, const char* filename, int showFlags) { return 0; }
+extern "C" int ListSearchText(void* listWin, const char* searchString, int searchParameter) { return 0; }
+extern "C" int ListSearchDialog(void* listWin, int findNext) { return 0; }
+extern "C" int ListSendCommand(void* listWin, int command, int parameter) { return 0; }
 
 extern "C" void ListCloseWindow(void* listWin) {
     @autoreleasepool {
