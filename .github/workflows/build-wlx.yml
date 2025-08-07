@@ -1,4 +1,4 @@
-name: Build MpvVideo WLX Plugin
+name: Build WLX Plugin (AVPlayerView)
 
 on:
   push:
@@ -10,25 +10,26 @@ jobs:
     runs-on: macos-13
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Prepare Output Directory
-        run: mkdir -p MpvVideo.wlx
-
-      - name: Build Universal WLX Plugin
+      - name: Set up build environment
         run: |
+          mkdir -p MpvVideo.wlx
           export CFLAGS="-arch arm64 -arch x86_64"
           export LDFLAGS="-arch arm64 -arch x86_64"
 
-          clang++ -ObjC++ -Wall -O2 -fPIC -fobjc-arc -DGL_SILENCE_DEPRECATION \
+          clang++ -ObjC++ -Wall -O2 -fobjc-arc -fPIC \
             $CFLAGS \
             -framework Cocoa \
-            -framework QuartzCore \
-            -framework AppKit \
+            -framework AVKit \
+            -framework AVFoundation \
             mpvvideo.mm \
             -dynamiclib -o MpvVideo.wlx/MpvVideo.wlx \
             $LDFLAGS
 
-      - name: List Output
-        run: ls -l MpvVideo.wlx/
+      - name: Upload Plugin Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: MpvVideo.wlx
+          path: MpvVideo.wlx/
