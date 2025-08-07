@@ -1,75 +1,65 @@
+//
+//  mpvvideo.mm
+//  WLX plugin for Double Commander (macOS) using mpv embedded playback
+//
+
 #import <Cocoa/Cocoa.h>
 #import <QuartzCore/QuartzCore.h>
 #import <OpenGL/gl3.h>
-
-// Import mpv headers from mpv subfolder
 #import <mpv/client.h>
 #import <mpv/opengl_cb.h>
+
+#define MPV_SUB_API_OPENGL_CB 1  // Define missing constant if header is incomplete
 
 @interface MpvGLView : NSOpenGLView {
     mpv_handle *mpv;
     mpv_opengl_cb_context *mpv_gl;
+    NSTimer *renderTimer;
 }
 @end
 
 @implementation MpvGLView
 
-- (instancetype)initWithFrame:(NSRect)frameRect {
+- (instancetype)initWithFrame:(NSRect)frame {
     NSOpenGLPixelFormatAttribute attrs[] = {
         NSOpenGLPFAAccelerated,
-        NSOpenGLPFAColorSize,   24,
-        NSOpenGLPFADepthSize,   16,
+        NSOpenGLPFAColorSize, 24,
+        NSOpenGLPFADepthSize, 16,
         NSOpenGLPFADoubleBuffer,
         NSOpenGLPFAOpenGLProfile,
         NSOpenGLProfileVersion3_2Core,
         0
     };
-
     NSOpenGLPixelFormat *fmt = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
-    self = [super initWithFrame:frameRect pixelFormat:fmt];
+    self = [super initWithFrame:frame pixelFormat:fmt];
     if (self) {
-        [self prepareMPV];
+        mpv = mpv_create();
+        mpv_initialize(mpv);
+        mpv_gl = (mpv_opengl_cb_context *)mpv_get_sub_api(mpv, MPV_SUB_API_OPENGL_CB);
+        mpv_opengl_cb_init_gl(mpv_gl, NULL, NULL);
+        mpv_set_option_string(mpv, "vo", "libmpv");
     }
     return self;
 }
 
-- (void)prepareMPV {
-    mpv = mpv_create();
-    if (!mpv) {
-        NSLog(@"Failed to create mpv instance.");
-        return;
-    }
-
-    // Initialize mpv and the OpenGL context
-    mpv_initialize(mpv);
-    mpv_gl = (mpv_opengl_cb_context *)mpv_get_sub_api(mpv, MPV_SUB_API_OPENGL_CB);
-    if (!mpv_gl) {
-        NSLog(@"Failed to get mpv OpenGL context.");
-        return;
-    }
-
-    // Setup rendering callback, etc.
-    // You should replace this with actual render loop logic
-}
-
 - (void)dealloc {
-    if (mpv_gl)
+    if (mpv_gl) {
         mpv_opengl_cb_uninit_gl(mpv_gl);
-    if (mpv)
+    }
+    if (mpv) {
         mpv_terminate_destroy(mpv);
+    }
+    [super dealloc];
 }
 
 @end
 
-// Entry point for WLX Plugin
-__attribute__((visibility("default")))
-void* ListLoad(HWND hwndParent, int fFlags, const char* filename, const void* file) {
-    // Basic loader stub
-    return NULL;
-}
+extern "C" void* ListLoad(void* hwndParent, int fFlags, const char* filename, const void* file) {
+    NSRect frame = NSMakeRect(0, 0, 800, 600);
+    MpvGLView *view = [[MpvGLView alloc] initWithFrame:frame];
 
-__attribute__((visibility("default")))
-int ListGetDetectString(char* DetectString, int maxlen) {
-    snprintf(DetectString, maxlen, "EXT=\"MP4\"\nEXT=\"MKV\"\nEXT=\"AVI\"");
-    return 0;
+    const char *args[] = {"loadfile", filename, NULL};
+    mpv_command_async(view->->mpv, 0, args);
+
+    return (__bridge_retained void *)view;
 }
