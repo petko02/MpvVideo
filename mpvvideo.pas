@@ -4,7 +4,7 @@ library MpvVideo;
 {$modeswitch objectivec1}
 
 uses
-  CocoaAll, MacOSAll, Classes, SysUtils;
+  CocoaAll, MacOSAll, Classes, SysUtilsuses, dynlibs;
 
 const
   LISTPLUGIN_OK = 0;
@@ -19,14 +19,20 @@ var
 
 function ListLoad(ParentWin: HWND; FileToLoad: PChar; ShowFlags: Integer): HWND; cdecl;
 var
-  contentView: NSView;
-  playerView: NSView;
-  frame: NSRect;
+  libHandle: TLibHandle;
 begin
-  if ParentWin = nil then
+  libHandle := LoadLibrary('libMpvPlayerView.dylib');
+  if libHandle = 0 then
   begin
-    Result := nil;
-    Exit;
+    writeln('❌ Failed to load libMpvPlayerView.dylib');
+    Exit(nil);
+  end;
+
+  Pointer(CreateMpvNSView) := GetProcAddress(libHandle, 'CreateMpvNSView');
+  if not Assigned(CreateMpvNSView) then
+  begin
+    writeln('❌ Failed to find CreateMpvNSView in dylib');
+    Exit(nil);
   end;
 
   contentView := NSView(ParentWin); // Cast pointer to NSView
