@@ -15,19 +15,20 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install fpc clang coreutils curl unzip mpv
+          brew install fpc coreutils curl unzip mpv
 
-      - name: Download mpv headers (client.h and opengl_cb.h)
+      - name: Download mpv headers
         run: |
           mkdir -p mpv
           curl -L -o mpv/opengl_cb.h https://raw.githubusercontent.com/Ivshti/libmpv/master/include/mpv/opengl_cb.h
           curl -L -o mpv/client.h https://raw.githubusercontent.com/mpv-player/mpv/v0.40.0/include/mpv/client.h
 
-      - name: Compile plugin
+      - name: Build plugin
         run: |
           export PKG_CONFIG_PATH="$(brew --prefix mpv)/lib/pkgconfig:${PKG_CONFIG_PATH}"
           CFLAGS="$(pkg-config --cflags mpv)"
           LDFLAGS="$(pkg-config --libs mpv)"
+          mkdir -p MpvVideo.wlx
           clang++ -ObjC++ -Wall -O2 -fPIC -fobjc-arc -DGL_SILENCE_DEPRECATION \
             $CFLAGS \
             -I. -Impv \
@@ -37,3 +38,9 @@ jobs:
             mpvvideo.mm \
             -dynamiclib -o MpvVideo.wlx/libmpvvideo.dylib \
             $LDFLAGS
+
+      - name: Upload WLX plugin artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: MpvVideo.wlx
+          path: MpvVideo.wlx/
