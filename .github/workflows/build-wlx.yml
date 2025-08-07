@@ -16,36 +16,39 @@ jobs:
       - name: Install dependencies
         run: |
           brew update
-          brew install mpv coreutils
+          brew install mpv pkg-config coreutils
 
-      - name: Download mpv headers into mpv/ subfolder
+      - name: Download required mpv headers
         run: |
           mkdir -p mpv
           curl -L -o mpv/opengl_cb.h https://raw.githubusercontent.com/Ivshti/libmpv/master/include/mpv/opengl_cb.h
-          curl -L -o mpv/client.h     https://raw.githubusercontent.com/mpv-player/mpv/v0.40.0/include/mpv/client.h
+          curl -L -o mpv/client.h https://raw.githubusercontent.com/mpv-player/mpv/v0.40.0/include/mpv/client.h
 
       - name: Prepare plugin directory
         run: mkdir -p MpvVideo.wlx
 
       - name: Compile Objective-C++
         run: |
-          PREFIX=$(brew --prefix mpv)
+          export PKG_CONFIG_PATH="$(brew --prefix mpv)/lib/pkgconfig:${PKG_CONFIG_PATH}"
+          CFLAGS="$(pkg-config --cflags mpv)"
+          LDFLAGS="$(pkg-config --libs mpv)"
           clang++ -ObjC++ -Wall -O2 -fPIC \
+            $CFLAGS \
             -I. \
-            -I"${PREFIX}/include" \
-            -L"${PREFIX}/lib" \
             -framework Cocoa \
             -framework QuartzCore \
             -framework OpenGL \
             mpvvideo.mm \
             -dynamiclib -o MpvVideo.wlx/libmpvvideo.dylib \
-            -lmpv
+            $LDFLAGS
 
       - name: Package for release
         run: |
           mkdir -p release/MpvVideo
           cp MpvVideo.wlx/libmpvvideo.dylib release/MpvVideo/
-          cp -r mpv mpvvideo.mm README.md release/MpvVideo/ || true
+          cp -R mpv release/MpvVideo/
+          cp mpvvideo.mm release/MpvVideo/ || true
+          cp README.md release/MpvVideo/ || true
           cd release && zip -r MpvVideo.zip MpvVideo
 
       - name: Upload artifact
