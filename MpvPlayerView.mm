@@ -45,9 +45,9 @@ typedef struct mpv_handle mpv_handle;
         return;
     }
 
-    mpv_handle* (*mpv_create)() = dlsym(self.libmpvHandle, "mpv_create");
-    int (*mpv_initialize)(mpv_handle*) = dlsym(self.libmpvHandle, "mpv_initialize");
-    int (*mpv_command)(mpv_handle*, const char*[]) = dlsym(self.libmpvHandle, "mpv_command");
+    mpv_handle* (*mpv_create)() = (mpv_handle* (*)())dlsym(self.libmpvHandle, "mpv_create");
+    int (*mpv_initialize)(mpv_handle*) = (int (*)(mpv_handle*))dlsym(self.libmpvHandle, "mpv_initialize");
+    int (*mpv_command)(mpv_handle*, const char*[]) = (int (*)(mpv_handle*, const char*[]))dlsym(self.libmpvHandle, "mpv_command");
 
     if (!mpv_create || !mpv_initialize || !mpv_command) {
         NSLog(@"❌ Missing libmpv symbols");
@@ -57,7 +57,7 @@ typedef struct mpv_handle mpv_handle;
     self.mpv = mpv_create();
     mpv_initialize(self.mpv);
 
-    // 🔧 Temporary test video (replace with dynamic path later)
+    // 🔧 Temporary test video
     const char *cmd[] = {"loadfile", "/System/Library/Sounds/Funk.aiff", NULL};
     mpv_command(self.mpv, cmd);
 
@@ -66,7 +66,7 @@ typedef struct mpv_handle mpv_handle;
 
 - (void)togglePlayPause:(id)sender {
     const char *cmd[] = { "cycle", "pause", NULL };
-    int (*mpv_command)(mpv_handle*, const char*[]) = dlsym(self.libmpvHandle, "mpv_command");
+    int (*mpv_command)(mpv_handle*, const char*[]) = (int (*)(mpv_handle*, const char*[]))dlsym(self.libmpvHandle, "mpv_command");
     if (mpv_command) mpv_command(self.mpv, cmd);
     self.isPlaying = !self.isPlaying;
     [self.playPauseButton setTitle:(self.isPlaying ? @"Pause" : @"Play")];
@@ -77,13 +77,12 @@ typedef struct mpv_handle mpv_handle;
     char buf[32];
     snprintf(buf, sizeof(buf), "%f", val);
     const char *cmd[] = {"seek", buf, "absolute-percent", NULL};
-    int (*mpv_command)(mpv_handle*, const char*[]) = dlsym(self.libmpvHandle, "mpv_command");
+    int (*mpv_command)(mpv_handle*, const char*[]) = (int (*)(mpv_handle*, const char*[]))dlsym(self.libmpvHandle, "mpv_command");
     if (mpv_command) mpv_command(self.mpv, cmd);
 }
 
 - (void)resizeSubviewsWithOldSize:(NSSize)oldSize {
     [super resizeSubviewsWithOldSize:oldSize];
-
     CGFloat width = self.frame.size.width;
     self.playPauseButton.frame = NSMakeRect(10, 10, 80, 30);
     self.seekSlider.frame = NSMakeRect(100, 15, width - 110, 20);
@@ -91,7 +90,7 @@ typedef struct mpv_handle mpv_handle;
 
 - (void)dealloc {
     if (self.mpv) {
-        int (*mpv_terminate_destroy)(mpv_handle*) = dlsym(self.libmpvHandle, "mpv_terminate_destroy");
+        int (*mpv_terminate_destroy)(mpv_handle*) = (int (*)(mpv_handle*))dlsym(self.libmpvHandle, "mpv_terminate_destroy");
         if (mpv_terminate_destroy) mpv_terminate_destroy(self.mpv);
         self.mpv = NULL;
     }
