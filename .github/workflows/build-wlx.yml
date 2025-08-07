@@ -1,4 +1,4 @@
-name: Build Universal mpv WLX Plugin
+name: Build Minimal WLX Plugin (MpvVideo)
 
 on:
   push:
@@ -10,31 +10,24 @@ jobs:
     runs-on: macos-13
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Prepare plugin build
-      run: |
-        mkdir -p MpvVideo.wlx
+      - name: Install dependencies
+        run: |
+          brew install coreutils
 
-        export CFLAGS="-arch arm64 -arch x86_64"
-        export LDFLAGS="-arch arm64 -arch x86_64 -L. -lmpv"
+      - name: Build WLX Plugin
+        run: |
+          mkdir -p MpvVideo.wlx
 
-        clang++ -ObjC++ -Wall -O2 -fPIC -fobjc-arc -DGL_SILENCE_DEPRECATION \
-          $CFLAGS \
-          -framework Cocoa \
-          -framework QuartzCore \
-          -framework OpenGL \
-          mpvvideo.mm \
-          -dynamiclib -o MpvVideo.wlx/MpvVideo.wlx \
-          $LDFLAGS
+          export CFLAGS="-arch arm64 -arch x86_64"
+          export LDFLAGS="-arch arm64 -arch x86_64"
 
-    - name: Archive plugin for distribution
-      run: |
-        zip -r MpvVideo.wlx.zip MpvVideo.wlx
+          clang++ -ObjC++ -Wall -O2 -fPIC -fobjc-arc -DGL_SILENCE_DEPRECATION             $CFLAGS             -framework Cocoa             -framework QuartzCore             -framework OpenGL             mpvvideo.mm             -dynamiclib -o MpvVideo.wlx/MpvVideo.wlx             $LDFLAGS
 
-    - name: Upload built plugin
-      uses: actions/upload-artifact@v4
-      with:
-        name: MpvVideoPlugin
-        path: MpvVideo.wlx.zip
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MpvVideo.wlx
+          path: MpvVideo.wlx/MpvVideo.wlx
