@@ -15,10 +15,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install fpc coreutils curl unzip
-          brew uninstall --ignore-dependencies mpv || true
-          HOMEBREW_NO_AUTO_UPDATE=1 arch -x86_64 brew install mpv --build-from-source
-          HOMEBREW_NO_AUTO_UPDATE=1 arch -arm64 brew install mpv --build-from-source
+          brew install fpc coreutils curl unzip mpv
 
       - name: Compile for x86_64
         run: |
@@ -52,18 +49,18 @@ jobs:
             -dynamiclib -o build/arm64/MpvVideo.wlx \
             $LDFLAGS
 
-      - name: Create fat binary
+      - name: Create universal fat plugin
         run: |
           mkdir -p MpvVideo.wlx
           lipo -create -output MpvVideo.wlx/MpvVideo.wlx \
             build/x86_64/MpvVideo.wlx build/arm64/MpvVideo.wlx
           file MpvVideo.wlx/MpvVideo.wlx
 
-      - name: Package plugin
+      - name: Zip plugin
         run: |
           zip -r MpvVideo.zip MpvVideo.wlx
 
-      - name: Upload plugin artifact
+      - name: Upload plugin zip
         uses: actions/upload-artifact@v4
         with:
           name: MpvVideo
