@@ -4,7 +4,7 @@ library MpvVideo;
 {$modeswitch objectivec1}
 
 uses
-  CocoaAll, MacOSAll, Classes, SysUtilsuses, dynlibs;
+  CocoaAll, MacOSAll, Classes, SysUtils, dynlibs;
 
 const
   LISTPLUGIN_OK = 0;
