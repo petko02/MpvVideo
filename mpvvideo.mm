@@ -1,41 +1,50 @@
-// mpvvideo.mm
 #import <Cocoa/Cocoa.h>
 #import <AVKit/AVKit.h>
-#import "wlxplugin.h"
+#import <AVFoundation/AVFoundation.h>
 
-NSView *previewView = nil;
-AVPlayerView *playerView = nil;
+extern "C" {
 
-int DCPCALL ListLoad(HWND ParentWin, char* FileToLoad, int ShowFlags)
-{
-    NSString *path = [NSString stringWithUTF8String:FileToLoad];
-    NSURL *url = [NSURL fileURLWithPath:path];
+// Global pointer to the player view so we can clean up
+static AVPlayerView *playerView = nil;
 
-    NSView *parent = (__bridge NSView *)(ParentWin);
+// WLX entry point
+void* ListLoad(void* hwndParent, int showFlags, char* fileToLoad, void* lps) {
+    @autoreleasepool {
+        if (!fileToLoad || !hwndParent) return nullptr;
 
-    playerView = [[AVPlayerView alloc] initWithFrame:parent.bounds];
-    playerView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-    playerView.controlsStyle = AVPlayerViewControlsStyleDefault;
-    playerView.player = [AVPlayer playerWithURL:url];
+        NSString *filePath = [NSString stringWithUTF8String:fileToLoad];
+        NSURL *videoURL = [NSURL fileURLWithPath:filePath];
 
-    [parent addSubview:playerView];
-    previewView = playerView;
+        NSView *parent = (__bridge NSView *)hwndParent;
 
-    [playerView.player play];
+        NSRect frame = parent.bounds;
+        playerView = [[AVPlayerView alloc] initWithFrame:frame];
+        playerView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+        playerView.controlsStyle = AVPlayerViewControlsStyleDefault;
 
-    return (int)(__bridge_retained void *)playerView;
+        AVPlayer *player = [AVPlayer playerWithURL:videoURL];
+        playerView.player = player;
+
+        [parent addSubview:playerView];
+        [player play];
+
+        return (__bridge_retained void *)playerView;
+    }
 }
 
-void DCPCALL ListCloseWindow(HWND ListWin)
-{
-    NSView *view = (__bridge_transfer NSView *)ListWin;
-    [view removeFromSuperview];
-    previewView = nil;
-    playerView = nil;
+void ListCloseWindow(void* listWin) {
+    @autoreleasepool {
+        if (listWin) {
+            NSView *view = (__bridge_transfer NSView *)listWin;
+            [view removeFromSuperview];
+        }
+        playerView = nil;
+    }
 }
 
-void DCPCALL ListGetDetectString(char* DetectString, int maxlen)
-{
-    snprintf(DetectString, maxlen,
-             "EXT=\"MP4\"|EXT=\"MKV\"|EXT=\"AVI\"|EXT=\"MOV\"|EXT=\"WMV\"");
+int ListGetDetectString(char* DetectString, int maxlen) {
+    snprintf(DetectString, maxlen, "EXT=\"MP4\"|EXT=\"MOV\"|EXT=\"MKV\"|EXT=\"AVI\"|EXT=\"WMV\"");
+    return 0;
+}
+
 }
