@@ -1,4 +1,4 @@
-name: Build MacPreview-Style WLX Plugin
+name: Build Minimal WLX Plugin
 
 on:
   push:
@@ -10,31 +10,24 @@ jobs:
     runs-on: macos-13
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up fat binary build (x86_64 + arm64)
+      - name: Set up build env
         run: |
           mkdir -p MpvVideo.wlx
-
           export CFLAGS="-arch arm64 -arch x86_64"
           export LDFLAGS="-arch arm64 -arch x86_64"
 
-          clang++ -ObjC++ -Wall -O2 -fPIC -fobjc-arc -DGL_SILENCE_DEPRECATION \
+          clang++ -ObjC++ -Wall -O2 -fPIC -fobjc-arc \
             $CFLAGS \
             -framework Cocoa \
-            -framework Quartz \
-            -framework QuickLook \
             mpvvideo.mm \
             -dynamiclib -o MpvVideo.wlx/MpvVideo.wlx \
             $LDFLAGS
 
-      - name: Zip the plugin
-        run: |
-          zip -r MpvVideo.wlx.zip MpvVideo.wlx
-
-      - name: Upload result
+      - name: Archive plugin
         uses: actions/upload-artifact@v4
         with:
           name: MpvVideo.wlx
-          path: MpvVideo.wlx.zip
+          path: MpvVideo.wlx/
