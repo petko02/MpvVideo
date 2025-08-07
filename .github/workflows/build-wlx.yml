@@ -30,3 +30,12 @@ jobs:
             mpvvideo.mm \
             -dynamiclib -o MpvVideo.wlx/MpvVideo.wlx \
             $LDFLAGS
+
+      - name: Zip plugin output
+        run: zip -r MpvVideo.zip MpvVideo.wlx
+
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MpvVideo
+          path: MpvVideo.zip
