@@ -1,4 +1,4 @@
-name: Build Minimal WLX Plugin
+name: Build Dummy WLX Plugin
 
 on:
   push:
@@ -10,10 +10,10 @@ jobs:
     runs-on: macos-13
 
     steps:
-      - name: Checkout
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Set up build env
+      - name: Build WLX Plugin
         run: |
           mkdir -p MpvVideo.wlx
           export CFLAGS="-arch arm64 -arch x86_64"
@@ -26,8 +26,11 @@ jobs:
             -dynamiclib -o MpvVideo.wlx/MpvVideo.wlx \
             $LDFLAGS
 
-      - name: Archive plugin
+      - name: Zip plugin
+        run: zip -r MpvVideo.zip MpvVideo.wlx
+
+      - name: Upload plugin
         uses: actions/upload-artifact@v4
         with:
-          name: MpvVideo.wlx
-          path: MpvVideo.wlx/
+          name: MpvVideo
+          path: MpvVideo.zip
