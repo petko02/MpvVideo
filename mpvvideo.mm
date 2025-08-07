@@ -74,9 +74,6 @@ int (*mpv_opengl_cb_draw_fn)(mpv_opengl_cb_context *, int, int, int) = NULL;
     mpv_opengl_cb_init_gl_fn(mpv_gl, NULL, NULL, NULL);
     mpv_opengl_cb_set_update_callback_fn(mpv_gl, &on_mpv_update, (__bridge void *)self);
 
-    const char *cmd[] = {"loadfile", "preview.mp4", NULL};
-    mpv_command(mpv, cmd);
-
     [self setupControls];
 
     renderTimer = [NSTimer scheduledTimerWithTimeInterval:0.03
@@ -143,19 +140,18 @@ void on_mpv_update(void *ctx) {
 
 // === Double Commander Plugin Interface ===
 
-extern "C" {
-
-void* ListLoad(void* hwndParent, int fFlags, const char* filename, const void* file) {
+extern "C" void* ListLoad(void* hwndParent, int showFlags, char* fileToLoad, struct ListDefaultParamStruct* lps) {
     @autoreleasepool {
-        NSRect frame = NSMakeRect(0, 0, 640, 360);
+        NSRect frame = NSMakeRect(0, 0, lps ? lps->size.cx : 640, lps ? lps->size.cy : 360);
         MpvGLView *view = [[MpvGLView alloc] initWithFrame:frame];
-        if (filename) {
-            const char *cmd[] = {"loadfile", filename, NULL};
+        if (fileToLoad && [[NSFileManager defaultManager] fileExistsAtPath:[NSString stringWithUTF8String:fileToLoad]]) {
+            const char *cmd[] = {"loadfile", fileToLoad, NULL};
             mpv_command([view getMPV], cmd);
         }
         return (__bridge_retained void *)view;
     }
 }
+
 
 int ListGetDetectString(char *DetectString, int maxlen) {
     snprintf(DetectString, maxlen, "EXT=\"MP4\"|EXT=\"MKV\"|EXT=\"AVI\"|EXT=\"MOV\"|EXT=\"WMV\"");
