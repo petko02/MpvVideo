@@ -1,17 +1,11 @@
 #import <Cocoa/Cocoa.h>
 #import <dlfcn.h>
-#import <QuartzCore/CAMetalLayer.h>  // or NSOpenGLView if fallback
 
 typedef struct mpv_handle mpv_handle;
-typedef struct mpv_render_context mpv_render_context;
-typedef void (*mpv_opengl_cb_draw_cb)(void *ctx);
-typedef void (*mpv_render_param);
 
 @interface MpvPlayerView : NSView
 @property void *libmpvHandle;
 @property mpv_handle *mpv;
-@property mpv_render_context *renderCtx;
-@property NSTimer *drawTimer;
 @property NSButton *playPauseButton;
 @property NSSlider *seekSlider;
 @property BOOL isPlaying;
@@ -31,12 +25,12 @@ typedef void (*mpv_render_param);
 
 - (void)setupUI {
     self.playPauseButton = [[NSButton alloc] initWithFrame:NSMakeRect(10, 10, 80, 30)];
-    [self.playPauseButton setTitle:@"Play"];
+    [self.playPauseButton setTitle:@"Pause"];
     [self.playPauseButton setTarget:self];
     [self.playPauseButton setAction:@selector(togglePlayPause:)];
     [self addSubview:self.playPauseButton];
 
-    self.seekSlider = [[NSSlider alloc] initWithFrame:NSMakeRect(100, 10, self.frame.size.width - 110, 20)];
+    self.seekSlider = [[NSSlider alloc] initWithFrame:NSMakeRect(100, 15, self.frame.size.width - 110, 20)];
     [self.seekSlider setMinValue:0];
     [self.seekSlider setMaxValue:100];
     [self.seekSlider setTarget:self];
@@ -47,7 +41,7 @@ typedef void (*mpv_render_param);
 - (void)initMPV {
     self.libmpvHandle = dlopen("./libmpv.dylib", RTLD_NOW);
     if (!self.libmpvHandle) {
-        NSLog(@"Failed to load libmpv");
+        NSLog(@"❌ Failed to load libmpv");
         return;
     }
 
@@ -56,14 +50,14 @@ typedef void (*mpv_render_param);
     int (*mpv_command)(mpv_handle*, const char*[]) = dlsym(self.libmpvHandle, "mpv_command");
 
     if (!mpv_create || !mpv_initialize || !mpv_command) {
-        NSLog(@"Missing symbols in libmpv");
+        NSLog(@"❌ Missing libmpv symbols");
         return;
     }
 
     self.mpv = mpv_create();
     mpv_initialize(self.mpv);
 
-    // Load test file
+    // 🔧 Temporary test video (replace with dynamic path later)
     const char *cmd[] = {"loadfile", "/System/Library/Sounds/Funk.aiff", NULL};
     mpv_command(self.mpv, cmd);
 
@@ -87,6 +81,14 @@ typedef void (*mpv_render_param);
     if (mpv_command) mpv_command(self.mpv, cmd);
 }
 
+- (void)resizeSubviewsWithOldSize:(NSSize)oldSize {
+    [super resizeSubviewsWithOldSize:oldSize];
+
+    CGFloat width = self.frame.size.width;
+    self.playPauseButton.frame = NSMakeRect(10, 10, 80, 30);
+    self.seekSlider.frame = NSMakeRect(100, 15, width - 110, 20);
+}
+
 - (void)dealloc {
     if (self.mpv) {
         int (*mpv_terminate_destroy)(mpv_handle*) = dlsym(self.libmpvHandle, "mpv_terminate_destroy");
@@ -100,3 +102,8 @@ typedef void (*mpv_render_param);
 }
 
 @end
+
+// 🔗 Exposed to Pascal
+extern "C" NSView *CreateMpvNSView(CGRect frame) {
+    return [[MpvPlayerView alloc] initWithFrame:frame];
+}
